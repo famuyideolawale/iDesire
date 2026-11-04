@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { randomBytes, createHash, randomUUID } from "node:crypto";
 import {
-  readBusiness,
+  readVisitorChat,
   parseBrand,
   mutate,
   record,
@@ -26,6 +26,7 @@ function response(value: unknown, brand: string, token: string) {
   });
   r.cookies.set("visitor-" + brand, token, {
     httpOnly: true,
+    secure: process.env.RENDER === "true",
     sameSite: "lax",
     path: "/",
     maxAge: 30 * 86400,
@@ -38,19 +39,9 @@ export async function GET(
 ) {
   try {
     const brand = parseBrand((await params).brand),
-      token = (await cookies()).get("visitor-" + brand)?.value,
-      b = await readBusiness(brand),
-      c = token
-        ? b.conversations.find((c) => c.visitorHash === hash(token))
-        : undefined;
+      token = (await cookies()).get("visitor-" + brand)?.value;
     return NextResponse.json(
-      {
-        conversation: c
-          ? { id: c.id, name: c.name, status: c.status, messages: c.messages }
-          : null,
-        welcome: b.settings.chatWelcome,
-        online: b.settings.chatOnline,
-      },
+      await readVisitorChat(brand, token ? hash(token) : undefined),
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (e) {

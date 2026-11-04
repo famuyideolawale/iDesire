@@ -23,7 +23,7 @@ Open **Accounts** in either admin to create staff with a generated password, mod
 
 Developers manage all accounts across both brands. Owners manage Managers within their own assigned businesses. Managers cannot manage accounts. Signed, HTTP-only sessions expire after eight hours and every private route checks current account access.
 
-For a fresh local database only, `node scripts/provision-developer.cjs` creates the first Developer through a one-use filesystem token and outputs its generated password once. It does not overwrite an existing Developer. The token is removed immediately; ordinary Owners cannot use the staff API to grant Developer access.
+For a fresh local database only, stop the server and run `node scripts/provision-developer.cjs` after the first launch has created `.local/store.json`. It provisions the first Developer and outputs the generated password once. It never overwrites an existing Developer. Restart the server afterward.
 
 ## Admin workflows
 
@@ -63,7 +63,19 @@ The server stores records in `.local/store.json`, maintains `.local/store.previo
 
 The browser only persists shopping bags. Older prototype localStorage records remain untouched and are no longer the authoritative admin database. The server starts from the supplied catalogue and fictional records, rather than automatically importing potentially mixed legacy records.
 
-Local functionality does not require external services. Actual online payments, email/SMS alerts, shipping integrations and internet hosting are not connected. Before public deployment, remove prefilled demo sign-ins, confirm client prices and stock, and replace this single-process local file store with a deployment-appropriate database and storage.
+Local functionality does not require external services. Actual online payments, email/SMS alerts and shipping integrations are not connected; staff confirm payments manually. Confirm the client’s catalogue prices and stock before accepting real orders.
+
+## Render and Neon hosting
+
+The hosted app uses Neon Postgres for records and private Neon object storage for uploads. `DATABASE_URL` switches to the cloud database; local development keeps using `.local` unless you supply cloud variables. See `.env.example` for variable names. Set secret values in Render, never in Git. With Render configured, missing persistence or session settings fail rather than silently using ephemeral files.
+
+Render service settings: Node runtime, Free instance, Frankfurt region, branch `main`, build `npm ci --include=dev && npm run build`, start `npx next start --hostname 0.0.0.0 --port $PORT`, and health path `/api/health`. Both storefronts and admins are served by this one service. The local commands continue to use port 2030.
+
+Cloud records use a Postgres JSONB document with transactional row locking. Concurrent edits serialize across server processes; failed edits roll back. Revision and private chat polls read only their required fields. Initialization runs once, preserving existing records on redeploy. The bootstrap variable contains the existing Developer hash; known demo sign-ins are never created. Operational example records remain clearly labelled Demo.
+
+Uploaded media use a private bucket and scoped server credentials with both `storage:read` and `storage:write`. Validated image URLs are served through `/media/...`; credentials never reach the browser. Sessions use a stable secret and secure cookies behind Render’s HTTPS proxy. Origin validation uses the configured public origin or Render’s assigned public URL.
+
+Render’s free service can sleep when idle, so an initial request may take longer. Database and media survive application restarts. Neon and Render have separate free usage limits; monitor them in their dashboards. Local and hosted records are independent after the initial site-content transfer.
 
 ## Verification
 

@@ -11,6 +11,11 @@ import { database } from "./store";
 import type { Brand, SessionUser } from "./types";
 let secretPromise: Promise<string> | undefined;
 async function secret() {
+  if (process.env.SESSION_SECRET) {
+    if (process.env.SESSION_SECRET.length < 48) throw new Error("SESSION_SECRET must contain at least 48 characters.");
+    return process.env.SESSION_SECRET;
+  }
+  if (process.env.RENDER === "true") throw new Error("SESSION_SECRET is required.");
   if (!secretPromise)
     secretPromise = (async () => {
       const dir = path.join(process.cwd(), ".local");
@@ -107,6 +112,7 @@ export async function login(email: string, password: string) {
 }
 export function checkOrigin(request: Request) {
   const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin)
+  const expected = process.env.APP_ORIGIN || process.env.RENDER_EXTERNAL_URL || new URL(request.url).origin;
+  if (origin && origin !== new URL(expected).origin)
     throw new AuthError("Cross-origin changes are not allowed.", 403);
 }

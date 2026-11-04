@@ -1,5 +1,4 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
+import { loadMedia } from "../../../lib/local/media";
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ filename: string }> },
@@ -8,11 +7,9 @@ export async function GET(
   if (!/^(idesire|kokies)-[a-f0-9-]+\.(png|jpg|webp)$/.test(filename))
     return new Response("Not found", { status: 404 });
   try {
-    const bytes = await readFile(
-      path.join(process.cwd(), ".local", "media", filename),
-    );
+    const bytes = await loadMedia(filename);
     const ext = filename.split(".").pop();
-    return new Response(bytes, {
+    return new Response(new Uint8Array(bytes), {
       headers: {
         "Content-Type": ext === "jpg" ? "image/jpeg" : `image/${ext}`,
         "X-Content-Type-Options": "nosniff",

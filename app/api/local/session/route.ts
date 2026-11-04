@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     response.cookies.set("dual-admin-session", await makeSession(user), {
       httpOnly: true,
       sameSite: "lax",
-      secure: new URL(request.url).protocol === "https:",
+      secure: process.env.RENDER === "true" || new URL(request.url).protocol === "https:",
       path: "/",
       maxAge: 8 * 3600,
     });

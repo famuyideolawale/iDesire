@@ -1,4 +1,4 @@
-import { randomBytes, scryptSync } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { products as fabrics } from "../products";
 import { giftProducts } from "../gift-data";
 import type {
@@ -377,42 +377,12 @@ export function seedBusiness(brand: Brand): BusinessData {
   };
 }
 export function seedDatabase(): StoreDatabase {
-  const users = [
-    {
-      id: "owner",
-      name: "Demo owner",
-      email: "owner@local.test",
-      brands: ["idesire", "kokies"] as Brand[],
-      role: "Owner" as const,
-    },
-    {
-      id: "idesire-manager",
-      name: "iDesire manager",
-      email: "idesire@local.test",
-      brands: ["idesire"] as Brand[],
-      role: "Manager" as const,
-    },
-    {
-      id: "kokies-manager",
-      name: "Kokies manager",
-      email: "kokies@local.test",
-      brands: ["kokies"] as Brand[],
-      role: "Manager" as const,
-    },
-  ].map((u) => {
-    const salt = randomBytes(16).toString("hex");
-    return {
-      ...u,
-      salt,
-      passwordHash: scryptSync("LocalDemo!2026", salt, 64).toString("hex"),
-    };
-  });
   return {
     version: 1,
     businesses: {
       idesire: seedBusiness("idesire"),
       kokies: seedBusiness("kokies"),
     },
-    users,
+    users: [],
   };
 }

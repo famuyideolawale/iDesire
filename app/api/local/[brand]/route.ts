@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   readBusiness,
+  readRevision,
   parseBrand,
   mutate,
   record,
@@ -17,13 +18,13 @@ export async function GET(
 ) {
   try {
     const brand = parseBrand((await params).brand);
-    const b = await readBusiness(brand);
     const query = new URL(request.url).searchParams;
     if (query.get("revision") === "1")
       return NextResponse.json(
-        { revision: b.revision },
+        { revision: await readRevision(brand) },
         { headers: { "Cache-Control": "no-store" } },
       );
+    const b = await readBusiness(brand);
     const preview = query.get("preview") === "1";
     if (preview) await requireUser(brand);
     return NextResponse.json(

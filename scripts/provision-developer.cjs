@@ -1,55 +1,19 @@
-// Local-only provisioning: the API requires this one-use filesystem token.
-const { randomBytes } = require("node:crypto");
-const { writeFile, unlink, mkdir } = require("node:fs/promises");
-const path = require("node:path");
-(async () => {
-  const base = process.env.LOCAL_BASE_URL || "http://localhost:2030";
-  const login = await fetch(base + "/api/local/session", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      email: "owner@local.test",
-      password: process.env.LOCAL_OWNER_PASSWORD || "LocalDemo!2026",
-    }),
-  });
-  if (!login.ok)
-    throw Error(
-      "Local owner sign-in failed. Set LOCAL_OWNER_PASSWORD if the local owner password was changed.",
-    );
-  const cookie = login.headers.get("set-cookie").split(";")[0];
-  const token = randomBytes(32).toString("hex");
-  const file = path.join(process.cwd(), ".local", "account-provision.token");
-  await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(file, token, { flag: "wx", mode: 0o600 });
-  try {
-    const r = await fetch(base + "/api/local/admin/idesire", {
-      method: "POST",
-      headers: { "content-type": "application/json", cookie },
-      body: JSON.stringify({
-        action: "createStaff",
-        name: "Developer",
-        username: "Developer",
-        email: "",
-        role: "Developer",
-        brands: ["idesire", "kokies"],
-        provisionToken: token,
-      }),
-    });
-    const data = await r.json();
-    if (!r.ok) throw Error(data.error);
-    console.log(
-      JSON.stringify({
-        username: data.result.username,
-        password: data.result.password,
-        id: data.result.account.id,
-      }),
-    );
-  } finally {
-    await unlink(file).catch((e) => {
-      if (e.code !== "ENOENT") throw e;
-    });
-  }
-})().catch((e) => {
-  console.error(e.message);
-  process.exit(1);
-});
+// Run only with the local server stopped. Cloud provisioning uses Render secrets.
+const {randomBytes,randomUUID,scryptSync}=require('node:crypto');
+const {readFile,writeFile,rename,copyFile}=require('node:fs/promises');
+const path=require('node:path');
+(async()=>{
+ if(process.env.DATABASE_URL||process.env.RENDER)throw Error('This script only provisions a local database.');
+ const file=path.join(process.cwd(),'.local','store.json');
+ const db=JSON.parse(await readFile(file,'utf8'));
+ if(db.users.some(u=>u.role==='Developer'))throw Error('A Developer already exists; no accounts were changed.');
+ const password=randomBytes(18).toString('base64url'),salt=randomBytes(16).toString('hex');
+ const user={id:randomUUID(),username:'Developer',name:'Developer',email:'',role:'Developer',brands:['idesire','kokies'],status:'Active',sessionVersion:0,createdAt:new Date().toISOString(),salt,passwordHash:scryptSync(password,salt,64).toString('hex')};
+ db.users.push(user);
+ const temp=file+'.'+randomUUID()+'.tmp';
+ await copyFile(file,file+'.before-provision');
+ await writeFile(temp,JSON.stringify(db,null,2),{flag:'wx'});
+ await rename(temp,file);
+ console.log(JSON.stringify({username:user.username,password,id:user.id}));
+ console.log('Restart the local server to use this account.');
+})().catch(e=>{console.error(e.message);process.exitCode=1;});

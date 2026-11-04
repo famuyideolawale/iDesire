@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { saveMedia } from "../../../../../lib/local/media";
 import { randomUUID } from "node:crypto";
 import { parseBrand, mutate } from "../../../../../lib/local/store";
 import { requireUser, checkOrigin } from "../../../../../lib/local/auth";
@@ -29,9 +28,7 @@ export async function POST(
     const extension = png ? "png" : jpg ? "jpg" : webp ? "webp" : "";
     if (!extension) throw new Error("Use a PNG, JPEG or WebP image.");
     const name = `${brand}-${randomUUID()}.${extension}`;
-    const folder = path.join(process.cwd(), ".local", "media");
-    await mkdir(folder, { recursive: true });
-    await writeFile(path.join(folder, name), bytes);
+    await saveMedia(name, bytes, jpg ? "image/jpeg" : `image/${extension}`);
     const media = {
       id: randomUUID(),
       src: "/media/" + name,

@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile, rename, copyFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { cloudEnabled, cloudDatabase, ready, sql } from "./cloud";
 import { seedDatabase } from "./seed";
 import type { Brand, BusinessData, StoreDatabase } from "./types";
 const directory = path.join(process.cwd(), ".local");
@@ -25,6 +26,8 @@ async function persist(data: StoreDatabase) {
   await rename(temporary, filename);
 }
 export async function database(): Promise<StoreDatabase> {
+  if (cloudEnabled()) return cloudDatabase();
+  if (process.env.RENDER === "true") throw new Error("Persistent database configuration is required.");
   if (!state.loaded)
     state.loaded = (async () => {
       await mkdir(directory, { recursive: true });
@@ -52,9 +55,7 @@ export async function mutate<T>(
   entity: string,
   callback: (business: BusinessData, db: StoreDatabase) => T | Promise<T>,
 ): Promise<T> {
-  const job = state.queue.then(async () => {
-    const current = await database();
-    const next = structuredClone(current);
+  const change = async (next: StoreDatabase) => {
     const business = next.businesses[brand];
     const result = await callback(business, next);
     business.revision++;
@@ -79,12 +80,57 @@ export async function mutate<T>(
       entity,
     });
     business.audit = business.audit.slice(0, 1500);
+    return result;
+  };
+  if (cloudEnabled()) {
+    await ready();
+    return sql().begin(async transaction => {
+      const rows = await transaction`SELECT data FROM website_state WHERE id = 1 FOR UPDATE`;
+      const next = rows[0].data as StoreDatabase;
+      const result = await change(next);
+      await transaction`UPDATE website_state SET data = ${transaction.json(next)}, updated_at = now() WHERE id = 1`;
+      return result;
+    }) as Promise<T>;
+  }
+  const job = state.queue.then(async () => {
+    const next = structuredClone(await database());
+    const result = await change(next);
     await persist(next);
     state.loaded = Promise.resolve(next);
     return result;
   });
   state.queue = job.catch(() => undefined);
   return job;
+}
+// Frequent polls fetch only the fields they need from Postgres.
+export async function readRevision(brand: Brand): Promise<number> {
+  if (!cloudEnabled()) return (await database()).businesses[brand].revision;
+  await ready();
+  const rows = await sql()`SELECT data->'businesses'->${brand}->>'revision' AS revision FROM website_state WHERE id = 1`;
+  return Number(rows[0].revision);
+}
+export async function readVisitorChat(brand: Brand, visitorHash?: string) {
+  let conversation: import("./types").Conversation | undefined;
+  let settings: Pick<BusinessData["settings"], "chatWelcome" | "chatOnline">;
+  if (cloudEnabled()) {
+    await ready();
+    const rows = await sql()`SELECT
+      data->'businesses'->${brand}->'settings'->'chatWelcome' AS welcome,
+      data->'businesses'->${brand}->'settings'->'chatOnline' AS online,
+      (SELECT c FROM jsonb_array_elements(data->'businesses'->${brand}->'conversations') AS c
+       WHERE c->>'visitorHash' = ${visitorHash ?? ""} LIMIT 1) AS conversation
+      FROM website_state WHERE id = 1`;
+    conversation = rows[0].conversation;
+    settings = { chatWelcome: rows[0].welcome, chatOnline: rows[0].online };
+  } else {
+    const b = await readBusiness(brand);
+    conversation = visitorHash ? b.conversations.find(c => c.visitorHash === visitorHash) : undefined;
+    settings = b.settings;
+  }
+  return {
+    conversation: conversation ? { id: conversation.id, name: conversation.name, status: conversation.status, messages: conversation.messages } : null,
+    welcome: settings.chatWelcome, online: settings.chatOnline,
+  };
 }
 export function parseBrand(value: string): Brand {
   if (value !== "idesire" && value !== "kokies")
