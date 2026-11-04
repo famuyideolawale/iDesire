@@ -1,0 +1,12 @@
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import KokiesPageIntro from '../../../components/KokiesPageIntro';
+
+export const metadata: Metadata = { title: { absolute: 'Corporate gifting | Kokies World of Gifts' } };
+export default function CorporateGifts() {
+  return <><KokiesPageIntro eyebrow="FOR YOUR BUSINESS" title="Appreciation, with your name on it." description="For the people who make your business what it is. Build a gifting brief for clients, teams, conferences and the milestones worth recognising."/>
+    <section className="kokies-editorial-split"><img src="/kokies/branded-notebooks.png" alt="Branded notebook and pen gift sets"/><div><span className="kokies-eyebrow">GOOD BUSINESS STARTS WITH PEOPLE</span><h2>A thoughtful thank-you leaves an impression.</h2><p>A practical desk gift. A personalised tumbler. A coordinated event set. Choose the starting point, then talk to us about your logo, colours, quantities and presentation.</p><p>We’ll confirm what can be customised, what is available and what fits your brief before you approve an order.</p><Link className="kokies-button" href="/kokies-world-of-gift/contact?type=Corporate%20gifting">Share your corporate gifting brief ↗</Link></div></section>
+    <section className="kokies-service-grid"><article><span>01 / CLIENT RELATIONSHIPS</span><h2>A thank-you they can keep.</h2><p>Recognition gifts and practical keepsakes for clients, partners and people who have supported your business.</p></article><article><span>02 / YOUR PEOPLE</span><h2>Celebrate the team.</h2><p>Mark a welcome, achievement, work anniversary or team celebration with a considered gifting idea.</p></article><article><span>03 / YOUR NEXT EVENT</span><h2>Keep the occasion with them.</h2><p>Explore coordinated merchandise and branded souvenirs for conferences, launches and gatherings.</p></article></section>
+    <section className="kokies-brief-panel"><div><span className="kokies-eyebrow">A SIMPLE START</span><h2>Your next gifting brief.</h2><p>Bring these details to your enquiry so we can begin with a useful conversation.</p></div><ul><li>The occasion and who the gifts are for</li><li>Your estimated quantity and budget per gift</li><li>Your logo, brand colours and personalisation ideas</li><li>The required date and delivery destination</li></ul><Link className="kokies-button" href="/kokies-world-of-gift/contact?type=Corporate%20gifting">Plan a business gift order ↗</Link></section>
+  </>;
+}

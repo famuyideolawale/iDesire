@@ -1,0 +1,129 @@
+import { NextResponse } from "next/server";
+import {
+  readBusiness,
+  parseBrand,
+  mutate,
+  record,
+  required,
+  text,
+} from "../../../../lib/local/store";
+import { checkOrigin, requireUser } from "../../../../lib/local/auth";
+import { body, failure } from "../../../../lib/local/http";
+import { createOrder, createEnquiry } from "../../../../lib/local/actions";
+export const dynamic = "force-dynamic";
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ brand: string }> },
+) {
+  try {
+    const brand = parseBrand((await params).brand);
+    const b = await readBusiness(brand);
+    const query = new URL(request.url).searchParams;
+    if (query.get("revision") === "1")
+      return NextResponse.json(
+        { revision: b.revision },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    const preview = query.get("preview") === "1";
+    if (preview) await requireUser(brand);
+    return NextResponse.json(
+      {
+        revision: b.revision,
+        previewAuthorized: preview,
+        sharedElements: preview
+          ? (b.sharedDesign?.draft ?? [])
+          : (b.sharedDesign?.published ?? []),
+        products: b.products.filter((p) => p.status === "published"),
+        inventory: b.inventory.map((i) => ({
+          productId: i.productId,
+          available: Math.max(0, i.stock - i.reserved),
+        })),
+        settings: b.settings,
+        pages: b.pages.map((p) => ({
+          id: p.id,
+          path: p.path,
+          published:
+            preview && query.get("page") === p.id ? p.draft : p.published,
+        })),
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  } catch (e) {
+    return failure(e);
+  }
+}
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ brand: string }> },
+) {
+  try {
+    checkOrigin(request);
+    const brand = parseBrand((await params).brand);
+    const input = record(await body(request));
+    if (input.type === "track") {
+      const b = await readBusiness(brand),
+        reference = required(input.reference, "Reference", 150).toLowerCase(),
+        phone = required(input.phone, "Phone", 60).replace(/\D/g, "");
+      const o = b.orders.find(
+        (o) =>
+          o.id.toLowerCase() === reference &&
+          o.phone.replace(/\D/g, "") === phone,
+      );
+      if (o)
+        return NextResponse.json({
+          reference: o.id,
+          status: o.status,
+          paymentStatus: o.paymentStatus,
+          total: o.total,
+          items: o.items.map((i) => ({ name: i.name, quantity: i.quantity })),
+          updatedAt: o.updatedAt,
+          history: o.history
+            .filter((h) => h.text.startsWith("Status"))
+            .map((h) => ({ at: h.at, text: h.text })),
+        });
+      const e = b.enquiries.find(
+        (e) =>
+          e.id.toLowerCase() === reference &&
+          e.phone.replace(/\D/g, "") === phone,
+      );
+      return e
+        ? NextResponse.json({
+            reference: e.id,
+            status: e.status,
+            items: [{ name: e.type, quantity: 0 }],
+            updatedAt: e.createdAt,
+          })
+        : NextResponse.json(
+            { error: "No record matches that reference and phone number." },
+            { status: 404 },
+          );
+    }
+    const result = await mutate(
+      brand,
+      "Website visitor",
+      String(input.type),
+      "website",
+      (b) => {
+        if (input.type === "order")
+          return createOrder(b, brand, input, "Website visitor");
+        if (input.type === "enquiry") return createEnquiry(b, brand, input);
+        if (input.type === "subscribe") {
+          const email = required(input.email, "Email", 200).toLowerCase();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+            throw new Error("Enter a valid email address.");
+          if (!b.subscribers.some((s) => s.email === email))
+            b.subscribers.push({
+              id: crypto.randomUUID(),
+              email,
+              createdAt: new Date().toISOString(),
+            });
+          return { ok: true };
+        }
+        throw new Error("Unsupported request.");
+      },
+    );
+    return NextResponse.json(result, { status: 201 });
+  } catch (e) {
+    return failure(e);
+  }
+}

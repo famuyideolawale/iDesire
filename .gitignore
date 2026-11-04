@@ -1,0 +1,27 @@
+# Dependencies and generated builds
+node_modules/
+.next/
+.next-dev/
+out/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# Local application database, password hashes, session secret and uploads
+.local/
+
+# Private environment values
+.env*
+!.env.example
+!.env.sample
+*.pem
+*.key
+
+# Local review artefacts and logs
+.playwright-cli/
+output/
+*.log
+.DS_Store
+Thumbs.db
+.vercel/
+.netlify/
