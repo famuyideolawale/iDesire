@@ -20,11 +20,14 @@ const stages = [
   ["Completed", "Completed"],
 ];
 
-export function OrderProgress({ receipt, brand }: { receipt: Receipt; brand: Brand }) {
+export function OrderProgress({ receipt, brand }: {
+  receipt: Pick<Receipt, "reference" | "status" | "paymentStatus"> & Partial<Receipt>;
+  brand: Brand;
+}) {
   const step = stages.findIndex(([, status]) => status === receipt.status);
   return <>
     <p><strong>{receipt.status}</strong> · Payment {receipt.paymentStatus.toLowerCase()}</p>
-    <p>{receipt.status === "Awaiting quotation" ? "Base estimate" : "Order total"}: <strong>{naira(receipt.total)}</strong></p>
+    {receipt.total !== undefined && <p>{receipt.status === "Awaiting quotation" ? "Base estimate" : "Order total"}: <strong>{naira(receipt.total)}</strong></p>}
     {receipt.quoteIssuedAt && <p>Final quote issued {new Date(receipt.quoteIssuedAt).toLocaleDateString()}. Delivery: {naira(receipt.deliveryFee ?? 0)}.</p>}
     {receipt.holdUntil && <p>Stock held until {new Date(receipt.holdUntil).toLocaleString()}.</p>}
     {receipt.paymentStatus === "Unpaid" && receipt.status === "Awaiting payment" && !receipt.holdUntil && (
@@ -36,7 +39,7 @@ export function OrderProgress({ receipt, brand }: { receipt: Receipt; brand: Bra
         <li key={status} aria-current={index === step ? "step" : undefined} data-complete={index < step}>{label}</li>
       ))}
     </ol>}
-    <ul className="receipt-items">{receipt.items.map((item, index) => <li key={index}>{item.name} × {item.quantity}</li>)}</ul>
+    {receipt.items && <ul className="receipt-items">{receipt.items.map((item, index) => <li key={index}>{item.name} × {item.quantity}</li>)}</ul>}
     {receipt.paymentStatus === "Unpaid" && <WhatsAppPayment brand={brand} reference={receipt.reference} status={receipt.status} />}
   </>;
 }

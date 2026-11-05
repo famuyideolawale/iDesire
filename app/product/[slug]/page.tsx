@@ -52,10 +52,16 @@ export default function ProductPage() {
   }
   const selectedColour = p.colours?.find((c) => c.slug === colourSlug);
   const image = selectedColour?.image ?? p.image;
-  const priceText = p.price
-    ? ` Price: ₦${p.price.toLocaleString("en-NG")} per yard. Estimated fabric subtotal: ₦${(p.price * yards * quantity).toLocaleString("en-NG")}.`
-    : " Please confirm the current price per yard and total before payment.";
-  const message = `Hello iDesire TRADS, I would like to enquire about ${p.name}${selectedColour ? `, colour: ${selectedColour.name}` : ""}, ${yards} yards per piece, quantity ${quantity}.${priceText} Please confirm availability, delivery and payment details.`;
+  const message = [
+    "Hi iDesire TRADS, I'd like to ask about this fabric:",
+    p.name,
+    selectedColour && "Colour: " + selectedColour.name,
+    "Quantity: " + quantity + (quantity === 1 ? " piece" : " pieces") + " × " + yards + " yards",
+    p.price === undefined ? "Price: Please quote" :
+      "Estimated subtotal: " + naira(p.price * yards * quantity) + " (" + naira(p.price) + "/yard)",
+    "",
+    "Is it available, and what would delivery cost?",
+  ].filter(line => line !== undefined).join("\n");
   const whatsappUrl = `https://wa.me/2348091142201?text=${encodeURIComponent(message)}`;
   return (
     <div className="product-detail page-shell" data-cms-product={p.slug}>

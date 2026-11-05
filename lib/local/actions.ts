@@ -201,7 +201,7 @@ export function createOrder(
           (!!i.personalisation.productColour && i.personalisation.productColour !== "As pictured"))),
     );
   const order: LocalOrder = {
-    id: `${brand === "idesire" ? "IDT" : "KWG"}-${Date.now()}-${randomBytes(2).toString("hex").toUpperCase()}`,
+    id: `${brand === "idesire" ? "IDT" : "KWG"}-${randomBytes(10).toString("hex").toUpperCase()}`,
     customerName,
     phone,
     email,
@@ -292,7 +292,7 @@ export function createEnquiry(
   input: Record<string, unknown>,
 ) {
   const e = {
-    id: `ENQ-${brand === "idesire" ? "IDT" : "KWG"}-${Date.now()}-${randomBytes(2).toString("hex")}`,
+    id: `ENQ-${brand === "idesire" ? "IDT" : "KWG"}-${randomBytes(10).toString("hex").toUpperCase()}`,
     customerName: required(input.customerName ?? input.name, "Your name", 180),
     phone: phoneNumber(input.phone),
     email: text(input.email, 200),

@@ -1,17 +1,27 @@
 "use client";
+
 import { CmsHeading } from "./CmsPage";
 import { useEffect, useState } from "react";
 import { api } from "../lib/local/client";
 import type { Brand } from "../lib/local/types";
 import { OrderArtwork } from "./OrderArtwork";
 import { OrderProgress, type Receipt } from "./OrderProgress";
+
+type TrackingResult = { reference: string; status: string; updatedAt: string } |
+  (Pick<Receipt, "reference" | "status" | "updatedAt" | "paymentStatus"> & Partial<Receipt>);
+
 export default function OrderTracker({ brand }: { brand: Brand }) {
   const [reference, setReference] = useState("");
-  const [verifiedPhone, setVerifiedPhone] = useState("");
+  const [result, setResult] = useState<TrackingResult | null>(null);
+  const [verified, setVerified] = useState<{ phone: string; receipt: Receipt }>();
+  const [error, setError] = useState("");
+  const [verificationError, setVerificationError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+
   useEffect(() => setReference(new URLSearchParams(location.search).get("reference") || ""), []);
-  const [result, setResult] = useState<Receipt | { reference: string; status: string; updatedAt: string; items: {name: string; quantity: number}[] } | null>(null),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
+  const endpoint = "/api/local/" + brand;
+
   return (
     <div className="page-shell track-page">
       <div className="page-hero">
@@ -19,59 +29,77 @@ export default function OrderTracker({ brand }: { brand: Brand }) {
           {brand === "kokies" ? "KOKIES WORLD OF GIFTS" : "iDESIRE TRADS"}
         </span>
         <CmsHeading>Track your order.</CmsHeading>
-        <p>
-          Enter your order or enquiry reference and the phone number used to
-          place it.
-        </p>
+        <p>Enter your order or enquiry reference to check its status.</p>
       </div>
       <section className="track-card">
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setBusy(true);
-            setError("");
-            setResult(null);
-            try {
-              const v = Object.fromEntries(
-                new FormData(e.currentTarget).entries(),
-              );
-              setResult(await api(`/api/local/${brand}`, { type: "track", ...v }));
-              setVerifiedPhone(String(v.phone));
-            } catch (e) {
-              setError((e as Error).message);
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
+        <form onSubmit={async e => {
+          e.preventDefault();
+          if (busy) return;
+          setBusy(true);
+          setError("");
+          setVerificationError("");
+          setVerified(undefined);
+          setResult(null);
+          try {
+            setResult(await api<TrackingResult>(endpoint, { type: "track", reference: reference.trim() }));
+          } catch (error) {
+            setError((error as Error).message);
+          } finally {
+            setBusy(false);
+          }
+        }}>
           <label>
             Order / enquiry reference
-            <input
-              name="reference"
-              value={reference}
-              onChange={e => setReference(e.target.value)}
-              required
-              placeholder={brand === "kokies" ? "KWG-…" : "IDT-…"}
-            />
+            <input name="reference" value={reference} onChange={e => setReference(e.target.value)}
+              required maxLength={150} spellCheck={false} autoCapitalize="characters"
+              placeholder={brand === "kokies" ? "KWG-…" : "IDT-…"} />
           </label>
-          <label>
-            Phone number
-            <input name="phone" type="tel" required />
-          </label>
-          <button className="button button-dark" disabled={busy}>
+          <button className="button button-dark" disabled={busy || !reference.trim()}>
             {busy ? "Checking…" : "Track order"}
           </button>
         </form>
         {error && <p role="alert">{error}</p>}
         {result && (
-          <div className="track-result" role="status">
-            <h2>{result.reference}</h2>
-            {"paymentStatus" in result ? <OrderProgress receipt={result} brand={brand} /> : <p>{result.status}</p>}
-            {brand === "kokies" && "paymentStatus" in result && <OrderArtwork key={result.reference} reference={result.reference}
-              phone={verifiedPhone} hasArtwork={result.hasArtwork} proof={result.proof}
-              editable={["Awaiting quotation", "Awaiting payment", "Paid"].includes(result.status)}
-              refresh={async () => setResult(await api(`/api/local/${brand}`, { type: "track", reference: result.reference, phone: verifiedPhone }))} />}
-            <p>Updated {new Date(result.updatedAt).toLocaleString()}</p>
+          <div className="track-result">
+            <div role="status">
+              <h2>{result.reference}</h2>
+              {"paymentStatus" in result ? <OrderProgress receipt={verified?.receipt ?? result} brand={brand} /> : <p>{result.status}</p>}
+              <p>Updated {new Date(verified?.receipt.updatedAt ?? result.updatedAt).toLocaleString()}</p>
+            </div>
+            {brand === "kokies" && "paymentStatus" in result && (
+              verified ? <OrderArtwork key={result.reference} reference={result.reference}
+                phone={verified.phone} hasArtwork={verified.receipt.hasArtwork} proof={verified.receipt.proof}
+                editable={["Awaiting quotation", "Awaiting payment", "Paid"].includes(verified.receipt.status)}
+                refresh={async () => setVerified({
+                  phone: verified.phone,
+                  receipt: await api<Receipt>(endpoint, { type: "track", reference: result.reference, phone: verified.phone }),
+                })} /> : (
+                <details>
+                  <summary>Access artwork and proofs</summary>
+                  <p>Verify the phone number used for this order to open its private files.</p>
+                  <form onSubmit={async e => {
+                    e.preventDefault();
+                    if (verifying) return;
+                    const phone = String(new FormData(e.currentTarget).get("phone") ?? "").trim();
+                    if (!phone) { setVerificationError("Enter the phone number used for this order."); return; }
+                    setVerifying(true);
+                    setVerificationError("");
+                    try {
+                      const receipt = await api<Receipt>(endpoint, { type: "track", reference: result.reference, phone });
+                      setVerified({ phone, receipt });
+                    } catch (error) {
+                      setVerificationError((error as Error).message);
+                    } finally {
+                      setVerifying(false);
+                    }
+                  }}>
+                    <label>Order phone number<input name="phone" type="tel" autoComplete="tel" required /></label>
+                    <button className="button button-outline" disabled={verifying}>{verifying ? "Verifying…" : "Verify and open"}</button>
+                  </form>
+                  {verificationError && <p role="alert">{verificationError}</p>}
+                </details>
+              )
+            )}
           </div>
         )}
       </section>

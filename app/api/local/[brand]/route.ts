@@ -95,27 +95,35 @@ export async function POST(
       limitRequest(request, "track", 20, 5 * 60_000);
       const b = await readBusiness(brand),
         reference = required(input.reference, "Reference", 150).toLowerCase(),
-        phone = normalPhone(required(input.phone, "Phone", 60));
+        suppliedPhone = text(input.phone, 60),
+        phone = normalPhone(suppliedPhone);
       const o = b.orders.find(
         (o) =>
           o.id.toLowerCase() === reference &&
-          normalPhone(o.phone) === phone,
+          (!suppliedPhone || (!!phone && normalPhone(o.phone) === phone)),
       );
-      if (o) return NextResponse.json(orderStatus(o), { headers: { "Cache-Control": "no-store" } });
+      if (o) {
+        const status = orderStatus(o);
+        return NextResponse.json(suppliedPhone ? status : {
+          reference: status.reference,
+          status: status.status,
+          paymentStatus: status.paymentStatus,
+          updatedAt: status.updatedAt,
+        }, { headers: { "Cache-Control": "no-store" } });
+      }
       const e = b.enquiries.find(
         (e) =>
           e.id.toLowerCase() === reference &&
-          normalPhone(e.phone) === phone,
+          (!suppliedPhone || (!!phone && normalPhone(e.phone) === phone)),
       );
       return e
         ? NextResponse.json({
             reference: e.id,
             status: e.status,
-            items: [{ name: e.type, quantity: 0 }],
             updatedAt: e.createdAt,
-          })
+          }, { headers: { "Cache-Control": "no-store" } })
         : NextResponse.json(
-            { error: "No record matches that reference and phone number." },
+            { error: suppliedPhone ? "That phone number does not match this reference." : "We could not find that reference. Check it and try again." },
             { status: 404 },
           );
     }

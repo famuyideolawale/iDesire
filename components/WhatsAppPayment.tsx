@@ -23,9 +23,9 @@ export function WhatsAppPayment({
   const international = digits.replace(/^00/, "").replace(/^0(?=\d{10}$)/, "234");
   const number = /^[1-9]\d{7,14}$/.test(international) ? international : defaultPhone;
   const request = quote
-    ? "Please confirm my final quote and share payment instructions."
-    : "Please confirm my final total and share payment instructions.";
-  const message = `Hello ${name}, my order reference is ${reference}. ${request}`;
+    ? "Could you share my final quote, including delivery?"
+    : "Could you confirm the amount due, including delivery, and send the payment instructions?";
+  const message = [`Hi ${name},`, `Order reference: ${reference}`, request].join("\n\n");
 
   return (
     <a

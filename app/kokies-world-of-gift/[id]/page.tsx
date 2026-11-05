@@ -108,7 +108,7 @@ export default function KokiesProductPage() {
               <label>Phone number<input type="tel" required autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)}/></label>
               <label>Event / required date<input value={event} onChange={e => setEvent(e.target.value)} placeholder="e.g. conference, wedding, date"/></label>
               <button className="kwg-order-primary" type="submit" disabled={busy}>{busy ? 'Sending...' : 'Send quote request'}</button>
-              <small>Keep your reference and phone number to track your request.</small>
+              <small>Keep your reference to track your request.</small>
             </div>}
           </details>
           {notice && <p className="kwg-order-notice" role="status">{notice}</p>}

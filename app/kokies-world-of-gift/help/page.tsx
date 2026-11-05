@@ -11,7 +11,7 @@ const questions = [
   ['How much wording can I add?', 'The standard personalisation allowance is eight words. Longer wording attracts an additional charge and requires a separate quote. The product form counts your words and asks you to acknowledge the extra charge before submitting. Final personalisation and colour availability are confirmed before production.'],
   ['How long will production and delivery take?', 'Timing depends on the product, quantity, customisation and destination. Give the team your required date and confirm the agreed production and delivery timeline before ordering. No standard delivery promise is set in this preview.'],
   ['What about changes, cancellations and returns?', 'Ask Kokies to confirm the applicable terms before payment, especially for personalised products. The client’s final cancellation, returns and refund policies have not yet been published in this preview.'],
-  ['Can I track an order?', 'Use your Kokies reference and phone number on the tracking page. This preview can find records saved on the same browser; contact Kokies for live delivery updates.'],
+  ['Can I track an order?', 'Enter your Kokies reference on the tracking page to check your status. Use the phone number from the order only if you want to view or approve a private artwork proof.'],
   ['How is Kokies connected to iDesire?', 'They are two separate businesses presented together for convenient discovery. Kokies specialises in gifts, personalisation and event souvenirs; iDesire TRADS specialises in Asoebi, occasion fabrics and wedding group orders. Each has its own website experience and staff workspace.'],
 ];
 export default function KokiesHelp() {
