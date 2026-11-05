@@ -1,17 +1,19 @@
 "use client";
 import { useEffect, useState } from "react";
-import { CmsHeading, CmsIntro } from "./CmsPage";
+import { CmsHeading } from "./CmsPage";
 import Link from "next/link";
 import { api, useLocal } from "../lib/local/client";
 import { readBag, saveBag, type BagLine } from "../lib/local/bag";
 import { type Brand, productPath, homePath } from "../lib/local/types";
 import { naira } from "../lib/products";
+import type { LocalOrder } from "../lib/local/types";
+import { WhatsAppPayment } from "./WhatsAppPayment";
 export default function ShoppingBag({ brand }: { brand: Brand }) {
   const { data } = useLocal(),
     [lines, setLines] = useState<BagLine[]>([]),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false),
-    [reference, setReference] = useState("");
+    [order, setOrder] = useState<Pick<LocalOrder, "id" | "status"> | null>(null);
   useEffect(() => {
     const load = () => setLines(readBag(brand));
     load();
@@ -40,19 +42,24 @@ export default function ShoppingBag({ brand }: { brand: Brand }) {
         <CmsHeading>
           {brand === "kokies" ? "Your gift bag." : "Your fabric bag."}
         </CmsHeading>
-        <p>Review your selection, then send your order to our team.</p>
+        <p>Review your selection and place your order to continue on WhatsApp.</p>
       </div>
-      {reference ? (
+      {order ? (
         <section className="track-card">
           <h2>Order received.</h2>
           <p>
-            Your reference is <strong>{reference}</strong>. Keep it with the
+            Your reference is <strong>{order.id}</strong>. Keep it with the
             phone number you used to track your order.
           </p>
           <p>
-            No payment was collected. Our team will confirm delivery,
-            availability and any personalisation charges.
+            Your order is unpaid. Message our team to confirm your final total
+            and get payment instructions.
           </p>
+          <WhatsAppPayment
+            brand={brand}
+            reference={order.id}
+            status={order.status}
+          />
           <Link
             href={`${homePath(brand) === "/" ? "" : homePath(brand)}/track-order`}
           >
@@ -140,19 +147,20 @@ export default function ShoppingBag({ brand }: { brand: Brand }) {
             className="track-card"
             onSubmit={async (e) => {
               e.preventDefault();
+              if (busy) return;
               setBusy(true);
               setNotice("");
               try {
                 const v = Object.fromEntries(
                   new FormData(e.currentTarget).entries(),
                 );
-                const r = await api(`/api/local/${brand}`, {
+                const r = await api<Pick<LocalOrder, "id" | "status">>(`/api/local/${brand}`, {
                   ...v,
                   type: "order",
                   items: lines,
                   source: "Website checkout",
                 });
-                setReference(r.id);
+                setOrder(r);
                 change([]);
               } catch (e) {
                 setNotice((e as Error).message);
@@ -187,13 +195,26 @@ export default function ShoppingBag({ brand }: { brand: Brand }) {
               Order notes / required date
               <textarea name="notes" />
             </label>
-            <button className="button button-dark full-button" disabled={busy}>
-              {busy ? "Submitting…" : "Send order to our team ↗"}
+            <fieldset className="checkout-payment">
+              <legend>Payment method</legend>
+              <div className="checkout-payment-active">
+                <strong>WhatsApp</strong>
+                <span>Available now</span>
+              </div>
+              <p>Place your order first, then continue with our team on WhatsApp.</p>
+              <div className="checkout-payment-options">
+                <button type="button" disabled>
+                  Paystack <span>Coming soon</span>
+                </button>
+                <button type="button" disabled>
+                  Flutterwave <span>Coming soon</span>
+                </button>
+              </div>
+            </fieldset>
+            <button className="button button-dark full-button" disabled={busy || !data}>
+              {busy ? "Placing order…" : "Place order to continue ↗"}
             </button>
             {notice && <p role="alert">{notice}</p>}
-            <small>
-              No payment is collected online in this local workspace.
-            </small>
           </form>
         </div>
       )}

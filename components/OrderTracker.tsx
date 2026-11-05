@@ -1,9 +1,10 @@
 "use client";
-import { CmsHeading, CmsIntro } from "./CmsPage";
+import { CmsHeading } from "./CmsPage";
 import { useState } from "react";
 import { naira } from "../lib/products";
 import { api } from "../lib/local/client";
 import type { Brand } from "../lib/local/types";
+import { WhatsAppPayment } from "./WhatsAppPayment";
 export default function OrderTracker({ brand }: { brand: Brand }) {
   const [result, setResult] = useState<any>(null),
     [error, setError] = useState(""),
@@ -63,6 +64,13 @@ export default function OrderTracker({ brand }: { brand: Brand }) {
             <h2>{result.reference}</h2>
             <strong>{result.status}</strong>
             {result.paymentStatus && <p>Payment: {result.paymentStatus}</p>}
+            {result.paymentStatus === "Unpaid" && (
+              <WhatsAppPayment
+                brand={brand}
+                reference={result.reference}
+                status={result.status}
+              />
+            )}
             {result.total !== undefined && (
               <p>
                 Recorded total: {naira(result.total)}
