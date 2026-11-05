@@ -35,7 +35,7 @@ export default function Header() {
         }}
       >
         <Link className="wordmark" href="/" aria-label="iDesire TRADS home">
-          <img src="/idesire-trads-logo.svg" alt="" />
+          <img src="/idesire-trads-logo.webp" alt="" />
         </Link>
         <nav
           id="idesire-navigation"

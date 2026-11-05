@@ -1,11 +1,12 @@
 "use client";
-import {api,useLocal} from '../../../lib/local/client';
+import {api} from '../../../lib/local/client';
 import {addToBag} from '../../../lib/local/bag';
 import {CmsHeading} from '../../../components/CmsPage';
 import Link from 'next/link';
+import { ProductGallery, CataloguePhoto } from '../../../components/ProductGallery';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
-import { useGiftCatalogue, readLocal, GiftOrder } from '../../../lib/kokies';
+import { useGiftCatalogue } from '../../../lib/kokies';
 import { countPersonalisationWords, STANDARD_WORD_ALLOWANCE, GiftPersonalisation } from '../../../lib/personalisation';
 
 const money = (value: number) => new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }).format(value);
@@ -13,9 +14,9 @@ const printColours: Record<string, string> = { Wine: '#74333a', Cream: '#fdf6ec'
 export default function KokiesProductPage() {
   const params = useParams();
   const products = useGiftCatalogue();
-  const {data:catalogueData}=useLocal();
   const product = products.find(p => String(p.id) === String(params.id));
-  const [quantity, setQuantity] = useState(100);
+  const [requestedQuantity, setQuantity] = useState<string>();
+  const [enquiryOpen, setEnquiryOpen] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [event, setEvent] = useState('');
@@ -35,15 +36,25 @@ export default function KokiesProductPage() {
   const extraWords = Math.max(0, wordCount - STANDARD_WORD_ALLOWANCE);
   const selectedProductColour = productColour === 'Custom colour' ? customColour.trim() : productColour;
   if (!product) return <div className="kwg-detail-shell"><h1>We couldn’t find that gift.</h1><Link href="/kokies-world-of-gift/shop">Back to the Kokies gift shop</Link></div>;
-  const total = quantity * product.price;
-  const minimum=product.minimum??100;
+  const minimum = product.minimum ?? 100;
+  const quantity = requestedQuantity === undefined ? minimum : Number(requestedQuantity);
+  const validQuantity = Number.isInteger(quantity) && quantity >= minimum && quantity <= 100000;
+  const total = (validQuantity ? quantity : minimum) * product.price;
+
+  function getPersonalisation(): GiftPersonalisation | null {
+    if (hasText && !wordCount) { setNotice('Enter the wording under Personalise this gift.'); return null; }
+    if (hasLogo && !artworkNotes.trim()) { setNotice('Enter the artwork brief under Personalise this gift.'); return null; }
+    if (!selectedProductColour) { setNotice('Describe your preferred colour under Personalise this gift.'); return null; }
+    if (extraWords && !extraAccepted) { setNotice('Acknowledge the additional wording quote under Personalise this gift.'); return null; }
+    return { method, wording: hasText ? wording.trim() : '', wordCount, extraWords, productColour: selectedProductColour, printColour: method !== 'none' ? printColour : '', placement: method !== 'none' ? placement : '', artworkNotes: hasLogo ? artworkNotes.trim() : '', additionalNotes: additionalNotes.trim(), extraWordingQuoteAccepted: extraWords > 0 && extraAccepted };
+  }
 
   async function submitOrder(e: React.FormEvent) {
     e.preventDefault();
-    if (!product || !name.trim() || !phone.trim()) { setNotice('Please enter your name and phone number.'); return; }
-    if (hasText && !wordCount) { setNotice('Please enter the wording you would like personalised.'); return; }
-    if (extraWords && !extraAccepted) { setNotice('Please acknowledge the additional-word quote before submitting.'); return; }
-    const personalisation: GiftPersonalisation = { method, wording: hasText ? wording.trim() : '', wordCount, extraWords, productColour: selectedProductColour, printColour: method !== 'none' ? printColour : '', placement: method !== 'none' ? placement : '', artworkNotes: hasLogo ? artworkNotes.trim() : '', additionalNotes: additionalNotes.trim(), extraWordingQuoteAccepted: extraWords > 0 && extraAccepted };
+    if (busy || !enquiryOpen || !product || !validQuantity) return;
+    if (!name.trim() || !phone.trim()) { setNotice('Please enter your name and phone number.'); return; }
+    const personalisation = getPersonalisation();
+    if (!personalisation) return;
     const details = [
       `Personalisation: ${method === 'none' ? 'Not requested' : method}`,
       `Preferred product colour: ${selectedProductColour} (availability to confirm)`,
@@ -54,16 +65,21 @@ export default function KokiesProductPage() {
       additionalNotes.trim(),
       'Base gift estimate excludes any personalisation, extra-word and delivery charges pending the final quote.',
     ].filter(Boolean).join('\n');
-    const order: GiftOrder = { reference: `KWG-${Date.now()}`, business: 'Kokies World of Gifts', product: product.name, quantity, unitPrice: product.price, estimatedTotal: total, customerName: name.trim(), phone: phone.trim(), event: event.trim(), customisation: details, personalisation, status: 'Enquiry received', createdAt: new Date().toISOString() };
     setBusy(true);
     try { const saved=await api('/api/local/kokies',{type:'order',kind:'enquiry',productId:String(product.id),quantity,customerName:name,phone,notes:`Event: ${event}\n${details}`,personalisation});setNotice(`Your enquiry ${saved.id} has reached the Kokies admin. The team will confirm costs and availability before payment.`); } catch(e){setNotice((e as Error).message)}finally{setBusy(false)}
   }
 
   return <div className="kwg-detail-shell" data-cms-product={String(product.id)}><div className="kwg-breadcrumb"><Link href="/kokies-world-of-gift/shop">The Kokies gift shop</Link><span>/</span><span>{product.category}</span></div>
-    <div className="kwg-detail-grid"><div className="kwg-detail-image"><img src={product.image} alt={product.name}/><span>PRODUCT PREVIEW · DEMO PRICE</span></div>
-      <div className="kwg-detail-copy"><span className="kokies-eyebrow">{product.category}</span><CmsHeading>{product.name}</CmsHeading><p>{product.note}</p>{product.sourceUrl && <a className="kwg-inspiration-link" href={product.sourceUrl} target="_blank" rel="noreferrer">See the inspiration on Kokies’ Instagram ↗</a>}<strong className="kwg-detail-price">{product.quoteOnly?'Price on request':money(product.price)} {!product.quoteOnly&&<small>per unit · provisional demo price</small>}</strong><div className="kwg-minimum-note"><b>Made for your occasion</b><span>Bulk product · minimum {minimum} units</span><span>Personalisation and colour requests are subject to product suitability and availability.</span></div>
-        <form className="kwg-order-form" onSubmit={submitOrder}>
-          <h2>Make it yours.</h2><label>Quantity (minimum {minimum})<input type="number" min={minimum} step={1} required value={quantity} onChange={e => setQuantity(Math.max(minimum, Math.floor(Number(e.target.value) || 100)))}/></label>
+    <div className="kwg-detail-grid"><div className="kwg-detail-image"><ProductGallery src={product.image} alt={product.name} photos={product.gallery} /></div>
+      <div className="kwg-detail-copy"><span className="kokies-eyebrow">{product.category}</span><CmsHeading>{product.name}</CmsHeading><p>{product.note}</p>{product.sourceUrl && <a className="kwg-inspiration-link" href={product.sourceUrl} target="_blank" rel="noreferrer">See the inspiration on Kokies’ Instagram ↗</a>}<strong className="kwg-detail-price">{product.quoteOnly || product.sample ? 'Request a quote':money(product.price)} {!product.quoteOnly && !product.sample && <small>{product.priceConfirmed && !product.sample ? 'per unit' : 'estimated per unit'}</small>}</strong><p className="kwg-order-minimum">Minimum order: {minimum} units</p>
+        <form className="kwg-order-form" onSubmit={submitOrder} onInvalidCapture={e => {
+          const section = (e.target as HTMLElement).closest('details');
+          if (section) section.open = true;
+        }}>
+          <label>Quantity<input type="number" min={minimum} max={100000} step={1} required value={requestedQuantity ?? minimum} onChange={e => setQuantity(e.target.value)}/></label>
+          <details className="kwg-order-disclosure">
+            <summary>Personalise this gift <span>Optional</span></summary>
+            <div className="kwg-order-fields">
           <label>Personalisation option<select value={method} onChange={e => { setMethod(e.target.value as GiftPersonalisation['method']); setExtraAccepted(false); }}><option value="none">No personalisation</option><option value="text">Name / message</option><option value="logo">Logo / artwork</option><option value="text-and-logo">Name / message + logo</option></select></label>
           <div className="kwg-colour-fields"><label>Preferred product colour<select value={productColour} onChange={e => setProductColour(e.target.value)}><option>As pictured</option><option>Wine</option><option>Cream</option><option>Black</option><option>White</option><option>Navy</option><option>Custom colour</option></select></label>{productColour === 'Custom colour' && <label>Describe your preferred colour<input required maxLength={100} value={customColour} onChange={e => setCustomColour(e.target.value)} placeholder="e.g. blush pink or #D8A6AD"/></label>}</div>
           {method !== 'none' && <><p className="kwg-personalisation-policy">Standard wording allowance: up to <b>8 words</b>. Additional words attract an extra charge, quoted separately. All personalisation finishes and costs are confirmed before production.</p>
@@ -74,10 +90,30 @@ export default function KokiesProductPage() {
             {extraWords > 0 && <label className="kwg-extra-acknowledgement"><input type="checkbox" required checked={extraAccepted} onChange={e => setExtraAccepted(e.target.checked)}/><span>I understand that {extraWords} extra word{extraWords === 1 ? '' : 's'} per unit will attract an additional charge. Kokies will quote the amount before I confirm my order.</span></label>}
           </>}
           <label>Other instructions (optional)<textarea value={additionalNotes} onChange={e => setAdditionalNotes(e.target.value)} rows={2} placeholder="Packaging, colour matching or special requests"/></label>
-          <div className="kwg-customisation-summary"><div><span>Base gift subtotal · {quantity} units</span><strong>{product.quoteOnly?'To quote':money(total)}</strong></div>{method !== 'none' && <div><span>Personalisation</span><b>Quoted separately</b></div>}{extraWords > 0 && <div><span>Extra wording · {extraWords} extra / unit</span><b>Additional quote required</b></div>}<small>Demo estimate. Personalisation, extra-word charges and delivery are excluded until your final quote is agreed.</small></div>
-          <button type="button" className="kwg-order-primary" onClick={()=>{addToBag('kokies',{productId:String(product.id),quantity,personalisation:{method,wording,wordCount,extraWords,productColour:selectedProductColour,printColour,placement,artworkNotes,additionalNotes,extraWordingQuoteAccepted:extraAccepted}});setNotice('Added to your gift bag. Open the gift bag to review and send your order.')}}>Add to gift bag</button><Link href="/kokies-world-of-gift/cart">View gift bag ↗</Link><h2 className="kwg-contact-title">Your order details</h2><label>Your name<input required autoComplete="name" value={name} onChange={e => setName(e.target.value)} placeholder="Name or organisation"/></label><label>Phone number<input type="tel" required autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)}/></label><label>Event / required date<input value={event} onChange={e => setEvent(e.target.value)} placeholder="e.g. conference, wedding, date"/></label><button className="kwg-order-primary" type="submit" disabled={busy}>Submit website order enquiry ↗</button><a className="kwg-order-whatsapp" href="https://www.instagram.com/kokiesworldofgifts/" target="_blank" rel="noreferrer">Discuss your gift on Instagram ↗</a>{notice && <p className="kwg-order-notice" role="status">{notice}</p>}<small>Your enquiry is securely saved to the local Kokies workspace. Track it using your reference and phone number.</small>
+            </div>
+          </details>
+          <div className="kwg-customisation-summary"><div><span>Base gift subtotal · {quantity} units</span><strong>{product.quoteOnly || product.sample ? 'To quote' : money(total)}</strong></div>{method !== 'none' && <div><span>Personalisation</span><b>Quoted separately</b></div>}{extraWords > 0 && <div><span>Extra wording · {extraWords} extra / unit</span><b>Additional quote required</b></div>}<small>Personalisation and delivery are confirmed separately.</small></div>
+          {!validQuantity && <p role="status">Enter a whole quantity from {minimum} to 100,000 units.</p>}
+          <button type="button" className="kwg-order-primary" disabled={!validQuantity} onClick={() => {
+            const personalisation = getPersonalisation();
+            if (!personalisation) return;
+            addToBag('kokies', {productId: String(product.id), quantity, personalisation});
+            setNotice('Added to your gift bag. Open the bag to review your order.');
+          }}>Add to gift bag</button>
+          <Link href="/kokies-world-of-gift/cart">View gift bag &#8599;</Link>
+          <details className="kwg-order-disclosure" onToggle={e => setEnquiryOpen(e.currentTarget.open)}>
+            <summary>Request a quote</summary>
+            {enquiryOpen && <div className="kwg-order-fields">
+              <label>Your name<input required autoComplete="name" value={name} onChange={e => setName(e.target.value)} placeholder="Name or organisation"/></label>
+              <label>Phone number<input type="tel" required autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)}/></label>
+              <label>Event / required date<input value={event} onChange={e => setEvent(e.target.value)} placeholder="e.g. conference, wedding, date"/></label>
+              <button className="kwg-order-primary" type="submit" disabled={busy}>{busy ? 'Sending...' : 'Send quote request'}</button>
+              <small>Keep your reference and phone number to track your request.</small>
+            </div>}
+          </details>
+          {notice && <p className="kwg-order-notice" role="status">{notice}</p>}
         </form><Link className="kwg-back-link" href="/kokies-world-of-gift/shop">← Continue browsing gifts</Link>
       </div>
-    </div><section className="kwg-related"><span className="kokies-eyebrow">MORE TO EXPLORE</span><h2>Other gifts in the collection</h2><div>{products.filter(p => p.id !== product.id).slice(0, 4).map(p => <Link key={p.id} href={`/kokies-world-of-gift/${p.id}`}><img src={p.image} alt={p.name} loading="lazy"/><b>{p.name}</b><span>{money(p.price)}</span></Link>)}</div></section>
+    </div><section className="kwg-related"><span className="kokies-eyebrow">MORE TO EXPLORE</span><h2>Other gifts in the collection</h2><div>{products.filter(p => p.id !== product.id).slice(0, 4).map(p => <Link key={p.id} href={`/kokies-world-of-gift/${p.id}`}><CataloguePhoto src={p.image} alt={p.name}/><b>{p.name}</b><span>{p.quoteOnly || p.sample ? "Request a quote" : money(p.price)}</span></Link>)}</div></section>
   </div>;
 }

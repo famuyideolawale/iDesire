@@ -10,7 +10,7 @@ export default function Footer() {
             href="/"
             aria-label="iDesire TRADS home"
           >
-            <img src="/idesire-trads-logo.svg" alt="iDesire TRADS" />
+            <img src="/idesire-trads-logo.webp" alt="iDesire TRADS" />
           </Link>
           <p>Fabrics and thoughtful finishing for your next celebration.</p>
         </div>

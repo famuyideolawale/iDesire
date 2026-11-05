@@ -38,7 +38,7 @@ export default function KokiesHeader() {
         className="kokies-brand"
         aria-label="Kokies home"
       >
-        <img src="/kokies/kokies-world-of-gifts-logo.jpg" alt="" />
+        <img src="/kokies/kokies-logo.webp" alt="" />
       </Link>
       <nav
         id="kokies-navigation"

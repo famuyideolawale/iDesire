@@ -10,7 +10,28 @@ import {
 } from "../../../../lib/local/store";
 import { checkOrigin, requireUser } from "../../../../lib/local/auth";
 import { body, failure } from "../../../../lib/local/http";
-import { createOrder, createEnquiry } from "../../../../lib/local/actions";
+import { availableStock, checkoutHash, createOrder, createEnquiry, holdExpired, needsFinalQuote, normalPhone } from "../../../../lib/local/actions";
+import { limitRequest } from "../../../../lib/local/rate-limit";
+import type { LocalOrder } from "../../../../lib/local/types";
+
+function orderStatus(o: LocalOrder) {
+  return {
+    id: o.id,
+    reference: o.id,
+    status: o.status === "Awaiting payment" && needsFinalQuote(o) ? "Awaiting quotation" : o.status,
+    paymentStatus: o.paymentStatus,
+    total: o.total,
+    quoteIssuedAt: o.quoteIssuedAt,
+    hasArtwork: !!o.artwork,
+    proof: o.proof && { id: o.proof.id, approvedAt: o.proof.approvedAt },
+    deliveryFee: o.deliveryFee,
+    holdUntil: holdExpired(o) ? undefined : o.holdUntil,
+    items: o.items.map(i => ({ name: i.name, quantity: i.quantity })),
+    updatedAt: o.updatedAt,
+    history: o.history.filter(h => h.text.startsWith("Status") || h.text === "Payment confirmed")
+      .map(h => ({ at: h.at, text: h.text })),
+  };
+}
 export const dynamic = "force-dynamic";
 export async function GET(
   request: Request,
@@ -37,7 +58,7 @@ export async function GET(
         products: b.products.filter((p) => p.status === "published"),
         inventory: b.inventory.map((i) => ({
           productId: i.productId,
-          available: Math.max(0, i.stock - i.reserved),
+          available: availableStock(b, i.productId),
         })),
         settings: b.settings,
         pages: b.pages.map((p) => ({
@@ -61,31 +82,30 @@ export async function POST(
     checkOrigin(request);
     const brand = parseBrand((await params).brand);
     const input = record(await body(request));
+    if (input.type === "receipt") {
+      limitRequest(request, "receipt", 60, 60_000);
+      const key = required(input.key, "Receipt key", 64);
+      const b = await readBusiness(brand);
+      const order = b.orders.find(o => o.checkoutKeyHash === checkoutHash(key));
+      return order
+        ? NextResponse.json(orderStatus(order), { headers: { "Cache-Control": "no-store" } })
+        : NextResponse.json({ error: "This receipt has not been saved." }, { status: 404 });
+    }
     if (input.type === "track") {
+      limitRequest(request, "track", 20, 5 * 60_000);
       const b = await readBusiness(brand),
         reference = required(input.reference, "Reference", 150).toLowerCase(),
-        phone = required(input.phone, "Phone", 60).replace(/\D/g, "");
+        phone = normalPhone(required(input.phone, "Phone", 60));
       const o = b.orders.find(
         (o) =>
           o.id.toLowerCase() === reference &&
-          o.phone.replace(/\D/g, "") === phone,
+          normalPhone(o.phone) === phone,
       );
-      if (o)
-        return NextResponse.json({
-          reference: o.id,
-          status: o.status,
-          paymentStatus: o.paymentStatus,
-          total: o.total,
-          items: o.items.map((i) => ({ name: i.name, quantity: i.quantity })),
-          updatedAt: o.updatedAt,
-          history: o.history
-            .filter((h) => h.text.startsWith("Status"))
-            .map((h) => ({ at: h.at, text: h.text })),
-        });
+      if (o) return NextResponse.json(orderStatus(o), { headers: { "Cache-Control": "no-store" } });
       const e = b.enquiries.find(
         (e) =>
           e.id.toLowerCase() === reference &&
-          e.phone.replace(/\D/g, "") === phone,
+          normalPhone(e.phone) === phone,
       );
       return e
         ? NextResponse.json({
@@ -99,6 +119,8 @@ export async function POST(
             { status: 404 },
           );
     }
+    if (input.type === "order" || input.type === "enquiry")
+      limitRequest(request, "order", 30, 5 * 60_000);
     const result = await mutate(
       brand,
       "Website visitor",
@@ -106,7 +128,7 @@ export async function POST(
       "website",
       (b) => {
         if (input.type === "order")
-          return createOrder(b, brand, input, "Website visitor");
+          return orderStatus(createOrder(b, brand, input, "Website visitor"));
         if (input.type === "enquiry") return createEnquiry(b, brand, input);
         if (input.type === "subscribe") {
           const email = required(input.email, "Email", 200).toLowerCase();

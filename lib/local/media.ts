@@ -37,3 +37,14 @@ export async function loadMedia(name: string): Promise<Uint8Array> {
   if (!result.Body) throw new Error("Image not found.");
   return result.Body.transformToByteArray();
 }
+export async function imageUpload(file: FormDataEntryValue | null) {
+  if (!(file instanceof File) || file.size > 5 * 1024 * 1024)
+    throw new Error("Choose a PNG, JPEG or WebP image up to 5 MB.");
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const png = bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  const jpg = bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
+  const webp = bytes.subarray(0, 4).toString() === "RIFF" && bytes.subarray(8, 12).toString() === "WEBP";
+  const extension = png ? "png" : jpg ? "jpg" : webp ? "webp" : "";
+  if (!extension) throw new Error("Use a PNG, JPEG or WebP image.");
+  return { bytes, extension, contentType: jpg ? "image/jpeg" : "image/" + extension };
+}

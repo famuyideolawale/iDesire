@@ -26,6 +26,8 @@ export type LocalProduct = {
   unit: "yard" | "unit";
   status: "published" | "draft";
   sample?: boolean;
+  priceConfirmed?: boolean;
+  gallery?: { src: string; label: string }[];
   colours?: { name: string; slug: string; hex: string; image: string }[];
   yardOptions?: number[];
   label?: string;
@@ -40,6 +42,7 @@ export type OrderLine = {
   colour?: string;
   personalisation?: Record<string, unknown>;
 };
+export type OrderAsset = { file: string; contentType: string };
 export type LocalOrder = {
   id: string;
   customerName: string;
@@ -56,6 +59,15 @@ export type LocalOrder = {
   updatedAt: string;
   history: { at: string; actor: string; text: string }[];
   reserved: boolean;
+  holdUntil?: string;
+  checkoutKeyHash?: string;
+  checkoutFingerprint?: string;
+  quoteRequired?: boolean;
+  artwork?: OrderAsset;
+  proof?: OrderAsset & { id: string; uploadedAt: string; approvedAt?: string };
+  quoteIssuedAt?: string;
+  deliveryFee?: number;
+  payment?: { amount: number; reference: string; confirmedAt: string; confirmedBy: string };
   demo?: boolean;
 };
 export type Enquiry = {

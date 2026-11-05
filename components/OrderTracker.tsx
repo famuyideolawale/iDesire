@@ -1,12 +1,15 @@
 "use client";
 import { CmsHeading } from "./CmsPage";
-import { useState } from "react";
-import { naira } from "../lib/products";
+import { useEffect, useState } from "react";
 import { api } from "../lib/local/client";
 import type { Brand } from "../lib/local/types";
-import { WhatsAppPayment } from "./WhatsAppPayment";
+import { OrderArtwork } from "./OrderArtwork";
+import { OrderProgress, type Receipt } from "./OrderProgress";
 export default function OrderTracker({ brand }: { brand: Brand }) {
-  const [result, setResult] = useState<any>(null),
+  const [reference, setReference] = useState("");
+  const [verifiedPhone, setVerifiedPhone] = useState("");
+  useEffect(() => setReference(new URLSearchParams(location.search).get("reference") || ""), []);
+  const [result, setResult] = useState<Receipt | { reference: string; status: string; updatedAt: string; items: {name: string; quantity: number}[] } | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   return (
@@ -32,9 +35,8 @@ export default function OrderTracker({ brand }: { brand: Brand }) {
               const v = Object.fromEntries(
                 new FormData(e.currentTarget).entries(),
               );
-              setResult(
-                await api(`/api/local/${brand}`, { type: "track", ...v }),
-              );
+              setResult(await api(`/api/local/${brand}`, { type: "track", ...v }));
+              setVerifiedPhone(String(v.phone));
             } catch (e) {
               setError((e as Error).message);
             } finally {
@@ -46,6 +48,8 @@ export default function OrderTracker({ brand }: { brand: Brand }) {
             Order / enquiry reference
             <input
               name="reference"
+              value={reference}
+              onChange={e => setReference(e.target.value)}
               required
               placeholder={brand === "kokies" ? "KWG-…" : "IDT-…"}
             />
@@ -62,35 +66,12 @@ export default function OrderTracker({ brand }: { brand: Brand }) {
         {result && (
           <div className="track-result" role="status">
             <h2>{result.reference}</h2>
-            <strong>{result.status}</strong>
-            {result.paymentStatus && <p>Payment: {result.paymentStatus}</p>}
-            {result.paymentStatus === "Unpaid" && (
-              <WhatsAppPayment
-                brand={brand}
-                reference={result.reference}
-                status={result.status}
-              />
-            )}
-            {result.total !== undefined && (
-              <p>
-                Recorded total: {naira(result.total)}
-                {result.status === "Awaiting quotation"
-                  ? " · subject to a final quote"
-                  : ""}
-              </p>
-            )}
-            {result.items.map((i: any, n: number) => (
-              <p key={n}>
-                {i.name}
-                {i.quantity ? " × " + i.quantity : ""}
-              </p>
-            ))}
+            {"paymentStatus" in result ? <OrderProgress receipt={result} brand={brand} /> : <p>{result.status}</p>}
+            {brand === "kokies" && "paymentStatus" in result && <OrderArtwork key={result.reference} reference={result.reference}
+              phone={verifiedPhone} hasArtwork={result.hasArtwork} proof={result.proof}
+              editable={["Awaiting quotation", "Awaiting payment", "Paid"].includes(result.status)}
+              refresh={async () => setResult(await api(`/api/local/${brand}`, { type: "track", reference: result.reference, phone: verifiedPhone }))} />}
             <p>Updated {new Date(result.updatedAt).toLocaleString()}</p>
-            {result.history?.map((h: any, i: number) => (
-              <p key={i}>
-                {h.text} · {new Date(h.at).toLocaleDateString()}
-              </p>
-            ))}
           </div>
         )}
       </section>

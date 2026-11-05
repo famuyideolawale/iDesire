@@ -7,10 +7,11 @@ import {
   products as seed,
   naira,
   Product,
-  readProductCatalogue,
 } from "../../../lib/products";
 import { CmsHeading } from "../../../components/CmsPage";
 import Link from "next/link";
+import { ProductGallery, CataloguePhoto } from "../../../components/ProductGallery";
+import { FabricServices } from "../../../components/FabricServices";
 
 export default function ProductPage() {
   const params = useParams<{ slug: string }>();
@@ -25,25 +26,20 @@ export default function ProductPage() {
   }, [serverData]);
   const p = catalogue.find((x) => x.slug === params.slug);
   const [colourSlug, setColourSlug] = useState("");
-  useEffect(() => {
-    if (p?.colours?.length) {
-      const requested = new URLSearchParams(window.location.search).get(
-        "colour",
-      );
-      setColourSlug(
-        (current) =>
-          current ||
-          (p.colours!.some((c) => c.slug === requested)
-            ? requested!
-            : p.colours![0].slug),
-      );
-    }
-  }, [p]);
   const [yards, setYards] = useState(5);
-  useEffect(() => {
-    setYards((current) => Math.max(p?.minimumYards ?? 5, current));
-  }, [p?.minimumYards]);
   const [quantity, setQuantity] = useState(1);
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const colour = params.get("colour");
+    setColourSlug(p?.colours?.find(c => c.slug === colour)?.slug ?? p?.colours?.[0]?.slug ?? "");
+    const minimum = p?.minimumYards ?? 5;
+    const length = Number(params.get("yards"));
+    const options = p?.yardOptions ?? [5, 6, 7, 8, 9, 10];
+    setYards(Number.isInteger(length) && length >= minimum && length <= 100000 &&
+      (!p?.colours?.length || options.includes(length) || length === minimum) ? length : minimum);
+    const pieces = Number(params.get("pieces"));
+    setQuantity(Number.isInteger(pieces) && pieces >= 1 && pieces <= 100000 ? pieces : 1);
+  }, [p?.slug, p?.minimumYards]);
   const [notice, setNotice] = useState("");
   if (!p) {
     if (!catalogueLoaded)
@@ -64,10 +60,7 @@ export default function ProductPage() {
   return (
     <div className="product-detail page-shell" data-cms-product={p.slug}>
       <div className="detail-image">
-        <img
-          src={image}
-          alt={`${p.name}${selectedColour ? ` in ${selectedColour.name}` : ""}`}
-        />
+        <ProductGallery src={image} alt={p.name + (selectedColour ? " in " + selectedColour.name : "")} />
         {p.colours && (
           <div
             style={{
@@ -83,6 +76,7 @@ export default function ProductPage() {
                 type="button"
                 onClick={() => setColourSlug(c.slug)}
                 aria-label={`View ${c.name}`}
+                aria-pressed={colourSlug === c.slug}
                 style={{
                   border:
                     colourSlug === c.slug
@@ -120,11 +114,7 @@ export default function ProductPage() {
           {p.price ? `${naira(p.price)} / yard` : "Price on request"}
         </strong>
         <p>{p.description}</p>
-        <p className="detail-note">
-          <strong>Minimum order: {p.minimumYards ?? 5} yards.</strong> Prices
-          shown are per yard. Customisable colours are available; terms and
-          conditions apply.
-        </p>
+        <p className="detail-note">Minimum order: {p.minimumYards ?? 5} yards.</p>
         {p.colours && (
           <>
             <label className="field-label">
@@ -145,9 +135,10 @@ export default function ProductPage() {
                   onClick={() => setColourSlug(c.slug)}
                   title={c.name}
                   aria-label={`Select ${c.name}`}
+                  aria-pressed={colourSlug === c.slug}
                   style={{
-                    width: 30,
-                    height: 30,
+                    width: 44,
+                    height: 44,
                     borderRadius: "50%",
                     background: c.hex,
                     border:
@@ -194,39 +185,6 @@ export default function ProductPage() {
                 </option>
               ))}
             </select>
-            <p style={{ fontSize: 13, color: "#756b68" }}>
-              Minimum order is {p.minimumYards ?? 5} yards. Confirm the required
-              length with your tailor before ordering.
-            </p>
-            {p.price && (
-              <div className="detail-accordions">
-                <details open>
-                  <summary>Optional extras & deals</summary>
-                  <ul>
-                    <li>2-Tone Aso-Oke Gele: ₦7,500</li>
-                    <li>Cotton Aso-Oke Gele: ₦7,000+ (depending on design)</li>
-                    <li>Raw Silk: ₦3,500</li>
-                    <li>Fila: ₦3,000–₦3,500</li>
-                  </ul>
-                  <p>
-                    Extras are priced separately and should be confirmed with
-                    our team.
-                  </p>
-                </details>
-                <details>
-                  <summary>Bulk order perks</summary>
-                  <ul>
-                    <li>Complimentary custom paper bags</li>
-                    <li>
-                      Free logo branding on orders (terms and conditions apply)
-                    </li>
-                    <li>
-                      Optional luxury packaging available at an additional fee
-                    </li>
-                  </ul>
-                </details>
-              </div>
-            )}
           </>
         )}
         {!p.colours && (
@@ -266,8 +224,11 @@ export default function ProductPage() {
           />
           <span>Need a larger quantity? Ask about a group order.</span>
         </div>
+        {serverData && p.price !== undefined && <p>{serverData.inventory.find(item => item.productId === p.slug)?.available ?? serverData.inventory.find(item => item.productId === serverData.products.find(product => product.slug === p.slug)?.id)?.available ?? 0} yards available</p>}
+        {p.price !== undefined && <p className="fabric-subtotal">Fabric subtotal <strong>{naira(p.price * yards * quantity)}</strong></p>}
+        <div className="fabric-actions">
         <button
-          className="button button-dark full-button"
+          className="button button-dark"
           onClick={() => {
             addToBag("idesire", {
               productId: p.slug,
@@ -279,32 +240,50 @@ export default function ProductPage() {
         >
           Add to fabric bag
         </button>
-        <Link className="button button-outline full-button" href="/cart">
-          View bag & send order ↗
+        <Link className="button button-outline" href="/cart">
+          View fabric bag ↗
         </Link>
+        </div>
         {notice && <p role="status">{notice}</p>}
-        <a
-          className="button button-dark full-button"
-          href={whatsappUrl}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Enquire about this fabric ↗
-        </a>
-        <a
-          className="button button-outline full-button"
-          href={`https://wa.me/2348091142201?text=${encodeURIComponent(message + " Please share payment and delivery options.")}`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Order on WhatsApp
+        <a className="text-link" href={whatsappUrl} target="_blank" rel="noreferrer">
+          Ask about this fabric on WhatsApp ↗
         </a>
         <div className="detail-accordions">
+          <FabricServices fabric={p.name} colour={colourSlug || undefined} yards={yards} quantity={quantity} />
+          {p.price && (
+            <>
+                <details>
+                  <summary>Optional extras & deals</summary>
+                  <ul>
+                    <li>2-Tone Aso-Oke Gele: ₦7,500</li>
+                    <li>Cotton Aso-Oke Gele: ₦7,000+ (depending on design)</li>
+                    <li>Raw Silk: ₦3,500</li>
+                    <li>Fila: ₦3,000–₦3,500</li>
+                  </ul>
+                  <p>
+                    Extras are priced separately and should be confirmed with
+                    our team.
+                  </p>
+                </details>
+                <details>
+                  <summary>Bulk order perks</summary>
+                  <ul>
+                    <li>Complimentary custom paper bags</li>
+                    <li>
+                      Free logo branding on orders (terms and conditions apply)
+                    </li>
+                    <li>
+                      Optional luxury packaging available at an additional fee
+                    </li>
+                  </ul>
+                </details>
+            </>
+          )}
           <details>
             <summary>Product details</summary>
             <p>
-              {p.description} Colours shown on screen may vary slightly from the
-              actual fabric. Contact us to confirm current stock.
+              Colours shown on screen may vary slightly from the actual fabric.
+              Custom colours are available subject to terms. Contact us to confirm current stock.
             </p>
           </details>
           <details>
@@ -316,7 +295,8 @@ export default function ProductPage() {
             </p>
           </details>
         </div>
-        <section className="related-products">
+      </div>
+      <section className="related-products">
           <div className="section-heading">
             <div>
               <span className="eyebrow">COMPLETE THE LOOK</span>
@@ -335,7 +315,7 @@ export default function ProductPage() {
               .map((item) => (
                 <div key={item.slug} className="related-card">
                   <Link href={`/product/${item.slug}`}>
-                    <img src={item.image} alt={item.name} />
+                    <CataloguePhoto src={item.image} alt={item.name} />
                     <span>{item.category}</span>
                     <h3>{item.name}</h3>
                     <strong>
@@ -347,8 +327,7 @@ export default function ProductPage() {
                 </div>
               ))}
           </div>
-        </section>
-      </div>
+      </section>
     </div>
   );
 }

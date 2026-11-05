@@ -42,7 +42,7 @@ export default function LiveChat({ brand = "idesire" }: { brand?: Brand }) {
       }
     };
     void load();
-    const timer = setInterval(() => void load(), 1400);
+    const timer = setInterval(() => { if (!document.hidden) void load(); }, 3000);
     window.addEventListener("focus", load);
     return () => {
       alive = false;

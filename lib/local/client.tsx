@@ -92,6 +92,8 @@ export function asGift(p: LocalProduct): GiftProduct {
     price: p.price ?? 0,
     minimum: p.minimum,
     quoteOnly: p.price === null,
+    priceConfirmed: p.priceConfirmed === true,
+    gallery: p.gallery,
     image: p.image,
     note: p.description,
     sample: p.sample,
@@ -106,7 +108,7 @@ export function watchChanges(brand: Brand, callback: () => void) {
     busy = false,
     last = -1;
   const poll = async () => {
-    if (stopped || busy) return;
+    if (stopped || busy || document.hidden) return;
     busy = true;
     try {
       const result = await api<{ revision: number }>(
@@ -121,12 +123,14 @@ export function watchChanges(brand: Brand, callback: () => void) {
       busy = false;
     }
   };
-  const timer = setInterval(() => void poll(), 1400);
+  const timer = setInterval(() => void poll(), 6000);
   void poll();
   window.addEventListener("focus", poll);
+  document.addEventListener("visibilitychange", poll);
   return () => {
     stopped = true;
     clearInterval(timer);
     window.removeEventListener("focus", poll);
+    document.removeEventListener("visibilitychange", poll);
   };
 }

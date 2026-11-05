@@ -11,6 +11,8 @@ export type GiftProduct = {
   sourceUrl?: string;
   minimum?: number;
   quoteOnly?: boolean;
+  priceConfirmed?: boolean;
+  gallery?: { src: string; label: string }[];
 };
 export const sampleGiftProducts: GiftProduct[] = [
   {

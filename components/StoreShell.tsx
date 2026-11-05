@@ -41,7 +41,7 @@ export default function StoreShell({
             <div className="kokies-footer-brand">
               <Link href="/kokies-world-of-gift" aria-label="Kokies home">
                 <img
-                  src="/kokies/kokies-world-of-gifts-logo.jpg"
+                  src="/kokies/kokies-logo.webp"
                   alt="Kokies World of Gifts"
                 />
               </Link>

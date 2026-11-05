@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { OrderArtwork } from "./OrderArtwork";
 import { api, watchChanges } from "../lib/local/client";
 import {
   brandNames,
@@ -99,7 +100,7 @@ export default function BusinessAdmin({ brand }: { brand: Brand }) {
     try {
       const r = await api(`/api/local/admin/${brand}`, input);
       await load();
-      setNotice("Saved to the local server.");
+      setNotice("Changes saved.");
       return r.result;
     } catch (e) {
       setError((e as Error).message);
@@ -306,7 +307,7 @@ export default function BusinessAdmin({ brand }: { brand: Brand }) {
                 <Products data={data} brand={brand} act={act} search={search} />
               )}{" "}
               {tab === "Orders" && (
-                <Orders data={data} act={act} search={search} />
+                <Orders data={data} act={act} search={search} brand={brand} refresh={load} />
               )}{" "}
               {tab === "Inventory" && <Inventory data={data} act={act} />}{" "}
               {tab === "Customers" && (
@@ -379,7 +380,7 @@ function Overview({ data, go }: { data: DeskData; go: (t: string) => void }) {
       "Collected revenue",
       naira(
         data.orders
-          .filter((o) => o.paymentStatus === "Paid")
+          .filter((o) => !o.demo && o.paymentStatus === "Paid")
           .reduce((n, o) => n + o.total, 0),
       ),
       "Orders",
@@ -507,6 +508,7 @@ function Products({
                   price: v.price === "" ? null : Number(v.price),
                   minimum: Number(v.minimum),
                   sample: v.sample === "on",
+                  priceConfirmed: v.priceConfirmed === "on",
                 },
               });
               if (result) {
@@ -574,6 +576,10 @@ function Products({
                   required
                 />
               </label>
+              {brand === "kokies" && <>
+                <label>Finish detail photo<input name="finishImage" list="media-options" defaultValue={selected?.gallery?.find(photo => photo.label === "Finish detail")?.src} /></label>
+                <label>Packaging and scale photo<input name="packagingImage" list="media-options" defaultValue={selected?.gallery?.find(photo => photo.label === "Packaging and scale")?.src} /></label>
+              </>}
               <datalist id="media-options">
                 {data.media.map((m) => (
                   <option key={m.id} value={m.src}>
@@ -581,6 +587,10 @@ function Products({
                   </option>
                 ))}
               </datalist>
+              {brand === "kokies" && <label className="desk-check">
+                <input type="checkbox" name="priceConfirmed" defaultChecked={selected?.priceConfirmed} />
+                Confirm this unit price for checkout
+              </label>}
               <label className="desk-check">
                 <input
                   name="sample"
@@ -664,10 +674,12 @@ function Products({
   );
 }
 function Orders({
+  brand, refresh,
   data,
   act,
   search,
 }: {
+  brand: Brand; refresh: () => Promise<void>;
   data: DeskData;
   act: Act;
   search: string;
@@ -679,12 +691,18 @@ function Orders({
   return (
     <>
       <div className="desk-row">
+        <div className="order-queues" aria-label="Order queues">
+          {[["Awaiting quotation", "Quotes"], ["Awaiting payment", "Verify payments"], ["Fulfilment", "Fulfilment"]].map(([value, label]) => (
+            <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}</button>
+          ))}
+        </div>
         <select
           aria-label="Filter order status"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         >
           <option>All</option>
+          <option>Fulfilment</option>
           {orderStatuses.map((s) => (
             <option key={s}>{s}</option>
           ))}
@@ -759,7 +777,7 @@ function Orders({
           {data.orders
             .filter(
               (o) =>
-                (filter === "All" || o.status === filter) &&
+                (filter === "All" || o.status === filter || (filter === "Fulfilment" && ["Paid", "Processing", "Ready for dispatch", "Dispatched"].includes(o.status))) &&
                 JSON.stringify(o).toLowerCase().includes(search.toLowerCase()),
             )
             .map((o) => (
@@ -783,6 +801,7 @@ function Orders({
         <section className="desk-card desk-detail">
           {order ? (
             <OrderDetail
+              brand={brand} refresh={refresh}
               key={order.id + "-" + order.updatedAt}
               order={order}
               act={act}
@@ -805,7 +824,7 @@ function Orders({
     </>
   );
 }
-function OrderDetail({ order: o, act }: { order: LocalOrder; act: Act }) {
+function OrderDetail({ order: o, act, brand, refresh }: { order: LocalOrder; act: Act; brand: Brand; refresh: () => Promise<void> }) {
   return (
     <>
       <div className="desk-row">
@@ -852,6 +871,20 @@ function OrderDetail({ order: o, act }: { order: LocalOrder; act: Act }) {
         Personalisation and delivery costs need a confirmed quote where
         applicable.
       </p>
+      {o.paymentStatus === "Unpaid" && o.status === "Awaiting payment" && (
+        <details>
+          <summary>Confirm received payment</summary>
+          <form onSubmit={e => {
+            e.preventDefault();
+            void act({ action: "confirmPayment", id: o.id, ...values(e.currentTarget) });
+          }}>
+            <label>Amount received (₦)<input name="amount" type="number" min="0" step="0.01" defaultValue={o.total} required /></label>
+            <label>Payment reference<input name="reference" maxLength={150} required /></label>
+            <button className="desk-primary">Confirm payment</button>
+          </form>
+        </details>
+      )}
+      {o.payment && <p>Payment {o.payment.reference} confirmed by {o.payment.confirmedBy} · {fmt(o.payment.confirmedAt)}</p>}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -862,7 +895,9 @@ function OrderDetail({ order: o, act }: { order: LocalOrder; act: Act }) {
         <label>
           Status
           <select name="status" defaultValue={o.status}>
-            {orderStatuses.map((s) => (
+            {orderStatuses.filter(s => s === o.status || (o.paymentStatus === "Paid"
+              ? ["Processing", "Ready for dispatch", "Dispatched", "Completed", "Cancelled"].includes(s)
+              : ["Awaiting quotation", "Cancelled"].includes(s))).map(s => (
               <option key={s}>{s}</option>
             ))}
           </select>
@@ -918,6 +953,8 @@ function OrderDetail({ order: o, act }: { order: LocalOrder; act: Act }) {
           <button>Save agreed quote</button>
         </form>
       </details>
+      {brand === "kokies" && <OrderArtwork key={o.id} reference={o.id} staff hasArtwork={!!o.artwork} proof={o.proof}
+        editable={["Awaiting quotation", "Awaiting payment", "Paid"].includes(o.status)} refresh={refresh} />}
       <h3>History & staff notes</h3>
       {o.history.map((h, i) => (
         <div className="desk-log" key={i}>
@@ -1367,8 +1404,7 @@ function MediaLibrary({
       <section className="desk-card">
         <h2>Brand media library</h2>
         <p>
-          Upload a JPEG, PNG or WebP up to 5 MB. Files are stored on the local
-          server.
+          Upload a JPEG, PNG or WebP up to 5 MB.
         </p>
         <form
           onSubmit={async (e) => {
@@ -1533,8 +1569,7 @@ function Settings({ data, act }: { data: DeskData; act: Act }) {
           Export this workspace
         </button>
         <p>
-          Records are stored in .local/store.json on this computer. The previous
-          save is kept as a backup. This is a local workspace; external payment
+          Export a workspace snapshot for your records. External payment
           and delivery services are not connected.
         </p>
       </section>

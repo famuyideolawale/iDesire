@@ -5,7 +5,7 @@ export default function SisterBrandFeature({ current }: { current: 'idesire' | '
   const gift = current === 'idesire';
   return <section className={`sister-feature ${gift ? 'meet-kokies' : 'meet-idesire'}`} aria-labelledby="sister-brand-title">
     <div className="sister-feature-copy"><span className="sister-kicker">A DIFFERENT BUSINESS. ANOTHER WAY TO CELEBRATE.</span>
-      <img className="sister-logo" src={gift ? '/kokies/kokies-world-of-gifts-logo.jpg' : '/idesire-trads-logo.svg'} alt={gift ? 'Kokies World of Gifts' : 'iDesire TRADS'}/>
+      <img className="sister-logo" src={gift ? '/kokies/kokies-logo.webp' : '/idesire-trads-logo.webp'} alt={gift ? 'Kokies World of Gifts' : 'iDesire TRADS'}/>
       <h2 id="sister-brand-title">{gift ? 'Meet Kokies World of Gifts.' : 'Meet iDesire TRADS.'}</h2>
       <p>{gift ? 'The outfits bring your people together. The gifts help them remember. Discover our sister business for personalised keepsakes, corporate gifts and beautifully branded event souvenirs.' : 'Found the perfect gift? Now dress for the occasion. Our sister business brings you statement lace, premium Asoebi and coordinated fabrics for weddings, family gatherings and your next big moment.'}</p>
       <div className="sister-categories">{(gift ? ['Personalised gifts', 'Corporate gifting', 'Event souvenirs'] : ['Premium lace', 'Asoebi collections', 'Wedding & group orders']).map(label => <span key={label}>{label}</span>)}</div>

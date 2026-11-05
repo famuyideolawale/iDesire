@@ -4,5 +4,5 @@ import KokiesPageIntro from '../../../components/KokiesPageIntro';
 
 export const metadata: Metadata = { title: { absolute: 'The gift shop | Kokies World of Gifts' }, description: 'Browse personalised drinkware, corporate gifts, event souvenirs and thoughtful keepsakes from Kokies.' };
 export default function GiftShop() {
-  return <><KokiesPageIntro eyebrow="THE GIFT SHOP" title="Find their kind of lovely." description="Useful, personal and chosen with an occasion in mind. Explore the collection, find a favourite and tell us how you’d like to make it yours."/><div className="kokies-shop-note">A note on ordering: prices are provisional demo prices. Bulk products start at 100 units; final pricing, personalisation and availability are confirmed with your quote.</div><GiftCatalogue/></>;
+  return <><KokiesPageIntro eyebrow="THE GIFT SHOP" title="Find their kind of lovely." description="Useful, personal and chosen with an occasion in mind. Explore the collection, find a favourite and tell us how you’d like to make it yours."/><div className="kokies-shop-note">Minimum quantities vary by gift. Items marked as estimates require a final quote before payment.</div><GiftCatalogue/></>;
 }

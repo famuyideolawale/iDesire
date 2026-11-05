@@ -6,6 +6,7 @@ import {
   sessionUser,
 } from "../../../../lib/local/auth";
 import { body, failure } from "../../../../lib/local/http";
+import { limitRequest } from "../../../../lib/local/rate-limit";
 export const dynamic = "force-dynamic";
 export async function GET() {
   return NextResponse.json(
@@ -16,6 +17,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     checkOrigin(request);
+    limitRequest(request, "signin", 15, 5 * 60_000);
     const input = await body(request);
     const user = await login(
       String(input.username || input.email || ""),

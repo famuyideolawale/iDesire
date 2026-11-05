@@ -1,6 +1,6 @@
 import { accountAction } from "./accounts";
 import { AuthError } from "./auth";
-import { randomUUID, randomBytes, scryptSync } from "node:crypto";
+import { randomUUID, randomBytes, scryptSync, createHash } from "node:crypto";
 import { text, required, positive, record, safeUrl } from "./store";
 import { countPersonalisationWords } from "../personalisation";
 import type {
@@ -16,10 +16,36 @@ import type {
 } from "./types";
 import { orderStatuses } from "./types";
 const stamp = () => new Date().toISOString();
-const normalPhone = (v: string) => v.replace(/\D/g, "");
+export function normalPhone(value: string) {
+  const digits = value.replace(/\D/g, "").replace(/^00/, "");
+  return /^0[789]\d{9}$/.test(digits) ? "234" + digits.slice(1) : digits;
+}
+export const checkoutHash = (value: string) => createHash("sha256").update(value).digest("hex");
+export function needsFinalQuote(order: LocalOrder) {
+  return (order.quoteRequired ?? order.history.some(event => event.text.startsWith("Order enquiry received"))) &&
+    !order.quoteIssuedAt && !(order.quoteRequired === undefined && order.history.some(event => event.text.startsWith("Quote issued:")));
+}
+export function holdExpired(order: LocalOrder) {
+  return order.reserved && order.paymentStatus === "Unpaid" &&
+    !order.demo && (order.holdUntil ? Date.parse(order.holdUntil) :
+      Date.parse(order.createdAt) + 24 * 60 * 60 * 1000) <= Date.now();
+}
+export function availableStock(b: BusinessData, productId: string) {
+  const inventory = b.inventory.find(i => i.productId === productId);
+  if (!inventory) return 0;
+  const expired = b.orders.filter(holdExpired).flatMap(o => o.items)
+    .filter(i => i.productId === productId).reduce((sum, i) => sum + i.quantity, 0);
+  return Math.max(0, inventory.stock - inventory.reserved + expired);
+}
+function expireHolds(b: BusinessData) {
+  for (const order of b.orders.filter(holdExpired)) {
+    release(b, order, "System");
+    order.history.push({ at: stamp(), actor: "System", text: "Stock hold expired; availability will be checked again before payment confirmation." });
+  }
+}
 function phoneNumber(value: unknown) {
   const phone = required(value, "Phone number", 60);
-  if (phone.replace(/\D/g, "").length < 7)
+  if (!/^\d{7,15}$/.test(normalPhone(phone)))
     throw new Error("Enter a valid phone number.");
   return phone;
 }
@@ -31,15 +57,10 @@ function upsertCustomer(
   address = "",
 ) {
   const existing = b.customers.find(
-    (c) =>
-      (phone && normalPhone(c.phone) === normalPhone(phone)) ||
-      (email && c.email.toLowerCase() === email.toLowerCase()),
+    (c) => normalPhone(c.phone) === normalPhone(phone) &&
+      c.email.toLowerCase() === email.toLowerCase(),
   );
-  if (existing) {
-    existing.name = name;
-    if (email) existing.email = email;
-    return existing;
-  }
+  if (existing) return existing;
   const customer = {
     id: randomUUID(),
     name,
@@ -70,6 +91,9 @@ export function personalisation(
   if (!["none", "text", "logo", "text-and-logo"].includes(method))
     throw new Error("Choose a valid personalisation option.");
   const wording = text(p.wording, 1500);
+  if ((method === "logo" || method === "text-and-logo") && !text(p.artworkNotes, 2000))
+    throw new Error("Describe the logo or artwork.");
+
   const hasText = method === "text" || method === "text-and-logo";
   const count = hasText ? countPersonalisationWords(wording) : 0;
   const extra = Math.max(0, count - 8);
@@ -98,6 +122,20 @@ export function createOrder(
   actor: string,
   manual = false,
 ): LocalOrder {
+  const key = text(input.checkoutKey, 64);
+  if (!manual && input.source === "Website checkout" && !key)
+    throw new Error("Refresh checkout before placing your order.");
+  if (key && !/^[a-f0-9-]{36}$/i.test(key)) throw new Error("Invalid checkout attempt.");
+  const keyHash = key ? checkoutHash(key) : undefined;
+  const { checkoutKey: _key, ...details } = input;
+  const fingerprint = keyHash ? checkoutHash(JSON.stringify(details)) : undefined;
+  const existing = keyHash && b.orders.find(o => o.checkoutKeyHash === keyHash);
+  if (existing) {
+    if (existing.checkoutFingerprint !== fingerprint)
+      throw new AuthError("This checkout attempt already saved a different order. Open your receipt before placing another.", 409);
+    return existing;
+  }
+  expireHolds(b);
   const customerName = required(
       input.customerName ?? input.name,
       "Customer name",
@@ -106,6 +144,10 @@ export function createOrder(
     phone = phoneNumber(input.phone),
     email = text(input.email, 200),
     address = text(input.address, 1000);
+  if (!manual && input.kind !== "enquiry") {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address.");
+    if (!address) throw new Error("Delivery address is required.");
+  }
   const rawLines = Array.isArray(input.items)
     ? input.items
     : [
@@ -134,6 +176,8 @@ export function createOrder(
     if (!Number.isInteger(quantity))
       throw new Error("Quantities must be whole numbers.");
     const colour = text(line.colour, 100);
+    if (colour && !product.colours?.some(c => c.name === colour))
+      throw new Error("Choose an available colour for " + product.name + ".");
     return {
       productId: product.id,
       name: product.name,
@@ -146,11 +190,15 @@ export function createOrder(
   });
   const quote =
     input.kind === "enquiry" ||
-    items.some((i) => b.products.find((p) => p.id === i.productId)?.sample) ||
+    items.some(i => {
+      const product = b.products.find(p => p.id === i.productId);
+      return product?.sample || (brand === "kokies" && !manual && product?.priceConfirmed !== true);
+    }) ||
     items.some(
       (i) =>
         i.unitPrice === null ||
-        (i.personalisation && i.personalisation.method !== "none"),
+        (i.personalisation && (i.personalisation.method !== "none" ||
+          (!!i.personalisation.productColour && i.personalisation.productColour !== "As pictured"))),
     );
   const order: LocalOrder = {
     id: `${brand === "idesire" ? "IDT" : "KWG"}-${Date.now()}-${randomBytes(2).toString("hex").toUpperCase()}`,
@@ -176,9 +224,13 @@ export function createOrder(
       },
     ],
     reserved: false,
+    quoteRequired: quote,
+    checkoutKeyHash: keyHash,
+    checkoutFingerprint: fingerprint,
   };
   if (!quote) {
     reserve(b, order, actor);
+    if (!manual) order.holdUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   }
   b.orders.unshift(order);
   upsertCustomer(b, customerName, phone, email, address);
@@ -232,6 +284,7 @@ function release(
     });
   }
   order.reserved = false;
+  delete order.holdUntil;
 }
 export function createEnquiry(
   b: BusinessData,
@@ -346,6 +399,7 @@ export function adminAction(
     throw new AuthError("Your access has changed. Sign in again.", 401);
   const action = required(input.action, "Action"),
     actor = user.name;
+  expireHolds(b);
   if (action === "saveProduct") {
     const x = record(input.product),
       id = text(x.id, 180) || randomUUID(),
@@ -369,8 +423,15 @@ export function adminAction(
       unit: brand === "idesire" ? "yard" : "unit",
       status: x.status === "draft" ? "draft" : "published",
       sample: x.sample === true,
+      priceConfirmed: x.priceConfirmed === true && price !== null,
     };
     const existing = b.products.find((v) => v.id === id);
+    p.gallery = brand === "kokies" && (x.finishImage !== undefined || x.packagingImage !== undefined)
+      ? [
+          { src: safeUrl(x.finishImage), label: "Finish detail" },
+          { src: safeUrl(x.packagingImage), label: "Packaging and scale" },
+        ].filter(photo => photo.src)
+      : existing?.gallery;
     if (b.products.some((v) => v.id !== id && v.slug === p.slug))
       throw new Error("Another product uses that URL slug.");
     if (existing) {
@@ -438,6 +499,25 @@ export function adminAction(
   }
   if (action === "recordOrder")
     return createOrder(b, brand, record(input.order), actor, true);
+  if (action === "confirmPayment") {
+    const order = b.orders.find(o => o.id === input.id);
+    if (!order || order.status !== "Awaiting payment" || order.paymentStatus !== "Unpaid")
+      throw new Error("Only an unpaid order awaiting payment can be confirmed.");
+    if (needsFinalQuote(order) || order.items.some(i => i.unitPrice === null))
+      throw new Error("Issue the final quote first.");
+    const amount = positive(typeof input.amount === "number" ? input.amount : required(input.amount, "Amount received"), 0, Number.MAX_SAFE_INTEGER / 100);
+    if (Math.round(amount * 100) !== Math.round(order.total * 100))
+      throw new Error("The received amount must match the agreed total.");
+    const reference = required(input.reference, "Payment reference", 150);
+    reserve(b, order, actor);
+    delete order.holdUntil;
+    order.payment = { amount, reference, confirmedAt: stamp(), confirmedBy: actor };
+    order.paymentStatus = "Paid";
+    order.status = "Paid";
+    order.updatedAt = stamp();
+    order.history.push({ at: stamp(), actor, text: "Payment confirmed" });
+    return order;
+  }
   if (action === "updateOrder") {
     const o = b.orders.find((v) => v.id === input.id);
     if (!o) throw new Error("Order not found.");
@@ -464,7 +544,19 @@ export function adminAction(
       o.items.some((i) => i.unitPrice === null)
     )
       throw new Error("Issue a final quote before confirming payment.");
-    if (status === "Awaiting quotation") release(b, o, actor);
+    if (status === "Awaiting payment" && (o.status === "Awaiting quotation" || needsFinalQuote(o)))
+      throw new Error("Use Issue / revise a quote to set the final total.");
+    if (["Paid", "Processing", "Ready for dispatch", "Dispatched", "Completed"].includes(status) && o.paymentStatus !== "Paid")
+      throw new Error("Confirm payment before moving this order into fulfilment.");
+    if (["Processing", "Ready for dispatch", "Dispatched", "Completed"].includes(status) &&
+      (o.proof || (o.checkoutKeyHash && o.items.some(i => ["logo", "text-and-logo"].includes(String(i.personalisation?.method))))) &&
+      !o.proof?.approvedAt)
+      throw new Error("The customer must approve the artwork proof before production.");
+    if (status === "Awaiting quotation") {
+      release(b, o, actor);
+      o.quoteRequired = true;
+      delete o.quoteIssuedAt;
+    }
     if (
       ["Dispatched", "Completed"].includes(o.status) &&
       !["Dispatched", "Completed"].includes(status)
@@ -490,16 +582,6 @@ export function adminAction(
       if (status === "Dispatched" || status === "Completed")
         release(b, o, actor, true);
     }
-    if (
-      [
-        "Paid",
-        "Processing",
-        "Ready for dispatch",
-        "Dispatched",
-        "Completed",
-      ].includes(status)
-    )
-      o.paymentStatus = "Paid";
     o.status = status;
     o.updatedAt = stamp();
     if (input.notes !== undefined) o.notes = text(input.notes, 12000);
@@ -522,6 +604,8 @@ export function adminAction(
       o.items.reduce((n, i) => n + (i.unitPrice ?? 0) * i.quantity, 0) +
       delivery;
     o.status = "Awaiting payment";
+    o.quoteIssuedAt = stamp();
+    o.deliveryFee = delivery;
     o.updatedAt = stamp();
     o.history.push({
       at: stamp(),
