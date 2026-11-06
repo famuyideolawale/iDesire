@@ -8,7 +8,7 @@ import { readFileSync, unlinkSync } from "node:fs";
 import path from "node:path";
 import { AuthError } from "./auth";
 import { required, text, record } from "./store";
-import { canManageAccount, canManageAccounts } from "./permissions";
+import { assignableRoles, canManageAccount, canManageAccounts } from "./permissions";
 import type { Brand, SessionUser, StoreDatabase } from "./types";
 export function publicAccount({
   salt: _salt,
@@ -80,15 +80,13 @@ function access(
   actor: SessionUser,
   brand: Brand,
   bootstrap = false,
+  currentBrands: Brand[] = [],
 ) {
   const role = (text(input.role) || "Manager") as SessionUser["role"];
   if (!["Developer", "Owner", "Manager"].includes(role))
     throw new Error("Choose a valid account role.");
-  if (actor.role !== "Developer" && !bootstrap && role !== "Manager")
-    throw new AuthError(
-      "Only a Developer can grant owner or developer access.",
-      403,
-    );
+  if (!bootstrap && !assignableRoles(actor).includes(role))
+    throw new AuthError("Only a Developer can grant developer access.", 403);
   const brands: Brand[] =
     role === "Developer"
       ? ["idesire", "kokies"]
@@ -102,10 +100,11 @@ function access(
           ]
         : [brand];
   if (!brands.length) throw new Error("Select at least one business.");
+  // Owners may keep an account's existing businesses, but only add their own.
   if (
     actor.role !== "Developer" &&
     !bootstrap &&
-    brands.some((b) => !actor.brands.includes(b))
+    brands.some((b) => !actor.brands.includes(b) && !currentBrands.includes(b))
   )
     throw new AuthError("You cannot grant access to that business.", 403);
   return { role, brands };
@@ -159,7 +158,7 @@ export function accountAction(
     return { removed: target.id };
   }
   if (action === "updateStaff") {
-    const scope = access(input, actor, brand);
+    const scope = access(input, actor, brand, false, target.brands);
     if (
       target.id === actor.id &&
       (scope.role !== actor.role ||

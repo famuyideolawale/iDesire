@@ -24,7 +24,7 @@ export default function Footer() {
           <h4>Help</h4>
           <Link href="/contact">Contact us</Link>
           <Link href="/track-order">Track your order</Link>
-          <Link href="/customisation">Customisation</Link>
+          <Link href="/kokies-world-of-gift/personalisation">Souvenirs by Kokies ↗</Link>
           <Link href="/account">Your account</Link>
         </div>
         <div>

@@ -99,6 +99,8 @@ export type Enquiry = {
   details: string;
   status: string;
   createdAt: string;
+  updatedAt?: string;
+  notes?: string;
   demo?: boolean;
 };
 export type Inventory = {
@@ -138,6 +140,7 @@ export type Conversation = {
   visitorHash: string;
   name: string;
   email: string;
+  phone?: string;
   status: "Waiting" | "Open" | "Resolved";
   assignedTo: string;
   tags: string[];

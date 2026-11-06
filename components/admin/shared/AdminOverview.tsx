@@ -36,7 +36,7 @@ export default function AdminOverview({ data, brand, session, go, signOut, repor
     [data.enquiries.filter(e => e.status === "New").length, "New enquiries", "Enquiries"],
     [unread, "Unread messages", "Live chat"],
     [lowStock, "Low stock products", "Inventory"],
-    [count("Ready for dispatch"), "Ready for dispatch", "Fulfilment"],
+    [count("Ready for dispatch"), "Ready for dispatch", "Orders"],
   ] as const;
   const lastMonth = reports && end ? new Date(end + "T12:00:00Z") : new Date();
   const series = Array.from({length: 6}, (_, index) => {

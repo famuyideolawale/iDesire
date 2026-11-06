@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Plus } from "lucide-react";
-import { canManageAccount } from "../lib/local/permissions";
+import { assignableRoles, canManageAccount } from "../lib/local/permissions";
 import { brandNames, type Brand, type SessionUser } from "../lib/local/types";
 import { Dialog, Empty, Heading, Metrics, SearchField } from "./admin/shared/OperationsWorkspaces";
 import { Pagination, useDataPage } from "./admin/shared/Density";
@@ -12,7 +12,7 @@ const roles = ["Manager", "Owner", "Developer"] as const;
 const businesses = Object.keys(brandNames) as Brand[];
 const roleAccess: Record<SessionUser["role"], string> = {
   Developer: "Manages both businesses and can manage all staff roles.",
-  Owner: "Manages assigned businesses and can manage Managers whose business access is within those assignments.",
+  Owner: "Manages assigned businesses and can see and manage every account except Developers.",
   Manager: "Works in assigned businesses and cannot manage staff accounts.",
 };
 type Result = { account?: SessionUser; username?: string; password?: string; removed?: string };
@@ -185,7 +185,7 @@ function AccountForm({ user, account, brand, working, onSave }: {
   const [role, setRole] = useState<SessionUser["role"]>(account?.role ?? "Manager");
   const [brands, setBrands] = useState<Brand[]>(account?.brands ?? [brand]);
   const self = account?.id === user.id;
-  const allowed = businesses.filter(b => user.role === "Developer" || user.brands.includes(b));
+  const allowed = businesses.filter(b => user.role === "Developer" || user.brands.includes(b) || !!account?.brands.includes(b));
   return <form onSubmit={event => {
     event.preventDefault();
     void onSave({ ...Object.fromEntries(new FormData(event.currentTarget)), role, brands: role === "Developer" ? businesses : brands });
@@ -198,7 +198,7 @@ function AccountForm({ user, account, brand, working, onSave }: {
       </div>
     </fieldset>
     <fieldset className="workspace-fieldset" disabled={working || self}><legend>Role & business access</legend>
-      <label>Account role<select value={role} onChange={event => setRole(event.target.value as SessionUser["role"])}>{roles.filter(r => user.role === "Developer" || r === "Manager").map(r => <option key={r}>{r}</option>)}</select></label>
+      <label>Account role<select value={role} onChange={event => setRole(event.target.value as SessionUser["role"])}>{roles.filter(r => assignableRoles(user).includes(r)).map(r => <option key={r}>{r}</option>)}</select></label>
       <p>{roleAccess[role]}</p>
       {allowed.map(b => <label className="desk-check" key={b}><input type="checkbox" checked={role === "Developer" || brands.includes(b)} disabled={role === "Developer"}
         onChange={event => setBrands(event.target.checked ? [...brands, b] : brands.filter(x => x !== b))} />{brandNames[b]}</label>)}

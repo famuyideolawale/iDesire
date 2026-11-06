@@ -12,6 +12,7 @@ import {
 import { checkOrigin } from "../../../../../lib/local/auth";
 import { body, failure } from "../../../../../lib/local/http";
 import { limitRequest } from "../../../../../lib/local/rate-limit";
+import { normalPhone } from "../../../../../lib/local/actions";
 
 const MAX_MESSAGES = 300;
 const MAX_CONVERSATIONS = 2000;
@@ -72,14 +73,19 @@ export async function POST(
       (b) => {
         let c = b.conversations.find((c) => c.visitorHash === hash(token));
         if (!c) {
+          // New conversations need a name and a phone number so the team can follow up.
+          if (!text(input.name)) throw new Error("Enter your name to start a chat.");
+          const phone = text(input.phone, 40);
+          if (!/^\d{10,15}$/.test(normalPhone(phone))) throw new Error("Enter a valid phone number so we can reach you.");
           const dayAgo = Date.now() - 86_400_000;
           if (b.conversations.filter((x) => Date.parse(x.createdAt) > dayAgo).length >= MAX_NEW_PER_DAY)
             throw new Error("Chat is busy right now. Please message us on WhatsApp.");
           c = {
             id: "CHAT-" + randomUUID(),
             visitorHash: hash(token),
-            name: text(input.name, 180) || "Website visitor",
+            name: text(input.name, 180),
             email: text(input.email, 200),
+            phone: text(input.phone, 40),
             status: "Waiting",
             assignedTo: "",
             tags: [],

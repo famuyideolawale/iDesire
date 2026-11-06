@@ -10,6 +10,7 @@ import {
 import { checkOrigin, requireUser } from "../../../../../lib/local/auth";
 import { body, failure } from "../../../../../lib/local/http";
 import { adminAction } from "../../../../../lib/local/actions";
+import { canSeeAccount } from "../../../../../lib/local/permissions";
 export const dynamic = "force-dynamic";
 export async function GET(
   _request: Request,
@@ -24,8 +25,8 @@ export async function GET(
       .filter((u) => u.brands.includes(brand))
       .map(publicAccount);
     const staff = brandAccounts.filter((u) => u.status !== "Suspended");
-    const accounts =
-      user.role === "Developer" ? users.map(publicAccount) : brandAccounts;
+    // Developers see every account; Owners see all but Developers; Managers see none.
+    const accounts = users.filter((u) => canSeeAccount(user, u)).map(publicAccount);
     return NextResponse.json(
       {
         ...b,

@@ -2,15 +2,20 @@
 
 import { useLocal } from "../lib/local/client";
 import type { Brand } from "../lib/local/types";
+import WhatsAppIcon from "./WhatsAppIcon";
 
 export function WhatsAppPayment({
   brand,
   reference,
   status,
+  items = [],
+  total,
 }: {
   brand: Brand;
   reference: string;
   status: string;
+  items?: { name: string; quantity: number }[];
+  total?: number;
 }) {
   const { data } = useLocal();
   const quote = status === "Awaiting quotation";
@@ -25,7 +30,9 @@ export function WhatsAppPayment({
   const request = quote
     ? "Could you share my final quote, including delivery?"
     : "Could you confirm the amount due, including delivery, and send the payment instructions?";
-  const message = [`Hi ${name},`, `Order reference: ${reference}`, request].join("\n\n");
+  const summary = items.map((item) => `- ${item.name} × ${item.quantity}`).join("\n");
+  const amount = !quote && total ? `Order total before delivery: ₦${total.toLocaleString("en-NG")}` : "";
+  const message = [`Hi ${name},`, `Order reference: ${reference}`, summary, amount, request].filter(Boolean).join("\n\n");
 
   return (
     <a
@@ -34,7 +41,7 @@ export function WhatsAppPayment({
       target="_blank"
       rel="noopener noreferrer"
     >
-      {quote ? "Confirm quote on WhatsApp" : "Continue payment on WhatsApp"} ↗
+      <WhatsAppIcon /> {quote ? "Get my quote on WhatsApp" : "Confirm payment on WhatsApp"}
     </a>
   );
 }

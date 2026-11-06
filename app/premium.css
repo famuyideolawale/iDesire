@@ -139,3 +139,91 @@ p { text-wrap: pretty; }
 .kokies-product-card { transition: transform 0.25s ease, box-shadow 0.25s ease; }
 .kokies-product-card:hover { transform: translateY(-3px); box-shadow: 0 18px 40px #4b192214; }
 @media (prefers-reduced-motion: reduce) { .kokies-product-card:hover { transform: none; } }
+
+/* ---------- Form controls follow the design system (closed state of every select) ---------- */
+.idesire-site select, .kokies-site select {
+  appearance: none; -webkit-appearance: none;
+  background-color: #fffdf9;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%235a2a36' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center; background-size: 12px 8px;
+  padding-right: 40px !important;
+  border: 1px solid #e2d2cb; border-radius: 10px; min-height: 46px;
+  font: 500 14px/1.3 'DM Sans', sans-serif; color: #2e1d20;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease; cursor: pointer;
+}
+.idesire-site select:hover, .kokies-site select:hover { border-color: #c9a9a2; }
+.idesire-site select:focus-visible, .kokies-site select:focus-visible { outline: none; border-color: #8a3a4a; box-shadow: 0 0 0 3px #8a3a4a26; }
+
+/* ---------- Checkout: delivery choice cards ---------- */
+.choice-cards { border: 0; padding: 0; margin: 4px 0 6px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.choice-cards legend { font-weight: 600; margin-bottom: 10px; padding: 0; color: inherit; font-size: 14px; }
+.choice-card { position: relative; display: block; cursor: pointer; }
+.choice-card input { position: absolute; opacity: 0; pointer-events: none; }
+.track-card .choice-card, .choice-card { margin: 0; padding: 0; font-weight: 400; }
+.choice-card > span {
+  position: relative; box-sizing: border-box;
+  display: grid; gap: 4px; height: 100%; align-content: start;
+  padding: 14px 14px 14px 42px; border: 1px solid #e2d2cb; border-radius: 12px; background: #fffdf9;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+.choice-card > span::before {
+  content: ""; position: absolute; left: 14px; top: 16px; width: 16px; height: 16px; border-radius: 50%;
+  border: 1.5px solid #b89a94; background: #fff; transition: all 0.2s ease; box-sizing: border-box;
+}
+.choice-card b { font-size: 14px; font-weight: 600; color: #2e1d20; }
+.choice-card small { font-size: 12px; line-height: 1.4; color: #7b6c69; font-weight: 400; }
+.choice-card input:checked + span { border-color: #800020; background: #fff6f3; box-shadow: 0 0 0 1px #800020; }
+.choice-card input:checked + span::before { border: 5px solid #800020; }
+.kokies-site .choice-card input:checked + span { border-color: #74333a; box-shadow: 0 0 0 1px #74333a; }
+.kokies-site .choice-card input:checked + span::before { border-color: #74333a; }
+.choice-card input:focus-visible + span { outline: 2px solid #b8873f; outline-offset: 2px; }
+.choice-note { font-size: 13px; color: #6f605d; background: #f8f0ea; border-radius: 10px; padding: 12px 14px; }
+@media (max-width: 420px) { .choice-cards { grid-template-columns: 1fr; } }
+
+/* ---------- Checkout: how payment works ---------- */
+.checkout-steps { border: 1px solid #ecdcd4; border-radius: 14px; padding: 18px 18px 6px; background: #fffaf6; margin: 6px 0 4px; }
+.checkout-steps h3 { font-size: 15px; margin: 0 0 12px; }
+.checkout-steps ol { list-style: none; counter-reset: step; padding: 0; margin: 0; display: grid; gap: 12px; }
+.checkout-steps li { counter-increment: step; position: relative; padding-left: 38px; display: grid; gap: 2px; padding-bottom: 12px; }
+.checkout-steps li::before {
+  content: counter(step); position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 50%;
+  display: grid; place-items: center; background: #800020; color: #fff5eb; font: 600 12px/1 'DM Sans', sans-serif;
+}
+.kokies-site .checkout-steps li::before { background: #74333a; }
+.checkout-steps li:not(:last-child)::after { content: ""; position: absolute; left: 12.5px; top: 30px; bottom: 0; border-left: 1px dashed #d9c3bc; }
+.checkout-steps b { font-size: 14px; }
+.checkout-steps span { font-size: 13px; color: #6f605d; line-height: 1.45; }
+.checkout-ask-whatsapp, .checkout-whatsapp {
+  display: flex !important; align-items: center; justify-content: center; gap: 9px;
+}
+.checkout-ask-whatsapp {
+  margin-top: 10px; padding: 13px 16px; border-radius: 999px; border: 1px solid #cfe3d5; background: #f3faf5;
+  color: #1f6b3a; font-weight: 600; font-size: 14px; text-decoration: none; transition: background 0.2s ease, border-color 0.2s ease;
+}
+.checkout-ask-whatsapp:hover { background: #e7f5ec; border-color: #9fd0ae; }
+
+/* ---------- Kokies product page: secondary actions ---------- */
+.kwg-order-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.kwg-order-secondary, .kwg-order-whatsapp-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 50px; padding: 12px 16px; border-radius: 8px; cursor: pointer;
+  font: 600 14px/1.2 'DM Sans', sans-serif; transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+.kwg-order-secondary { background: #fffaf4; color: #74333a; border: 1.5px solid #74333a; }
+.kwg-order-secondary:hover:not(:disabled) { background: #74333a; color: #fffaf4; }
+.kwg-order-whatsapp-button { background: #f3faf5; color: #1f6b3a; border: 1.5px solid #bfe0c9; }
+.kwg-order-whatsapp-button:hover:not(:disabled) { background: #1f6b3a; color: #fff; border-color: #1f6b3a; }
+.kwg-order-secondary:active:not(:disabled), .kwg-order-whatsapp-button:active:not(:disabled) { transform: translateY(1px); }
+.kwg-order-secondary:disabled, .kwg-order-whatsapp-button:disabled { opacity: 0.45; cursor: not-allowed; }
+.kwg-view-bag { display: inline-block; margin-top: 12px; font-size: 13px; color: #74333a; text-underline-offset: 3px; }
+@media (max-width: 420px) { .kwg-order-actions { grid-template-columns: 1fr; } }
+
+/* ---------- Live chat: tidy contact fields ---------- */
+.chat-panel form input[type="tel"] { width: 100%; }
+
+/* ---------- Bag: quantity field ---------- */
+.shopping-bag .bag-item input[type="number"] {
+  width: 96px; min-height: 42px; padding: 8px 12px; border: 1px solid #e2d2cb; border-radius: 10px;
+  background: #fffdf9; font: 500 14px/1 'DM Sans', sans-serif;
+}
+.shopping-bag .bag-item .stock-line { font-size: 13px; color: #4f6b4f; }

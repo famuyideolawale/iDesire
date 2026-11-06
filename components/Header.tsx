@@ -9,7 +9,6 @@ const navigation = [
   { name: "Shop fabrics", href: "/shop", className: "shop-all-link" },
   { name: "Asoebi", href: "/new" },
   { name: "Weddings", href: "/wedding-orders" },
-  { name: "Customisation", href: "/customisation" },
   { name: "Our story", href: "/about" },
 ];
 export default function Header() {

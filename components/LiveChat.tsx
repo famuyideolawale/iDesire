@@ -8,6 +8,7 @@ export default function LiveChat({ brand = "idesire" }: { brand?: Brand }) {
   const [open, setOpen] = useState(false),
     [name, setName] = useState(""),
     [email, setEmail] = useState(""),
+    [phone, setPhone] = useState(""),
     [text, setText] = useState(""),
     [conversation, setConversation] = useState<Conversation | null>(null),
     [error, setError] = useState(""),
@@ -71,7 +72,7 @@ export default function LiveChat({ brand = "idesire" }: { brand?: Brand }) {
     setBusy(true);
     setError("");
     try {
-      const d = await api(`/api/local/chat/${brand}`, { name, email, text });
+      const d = await api(`/api/local/chat/${brand}`, { name, email, phone, text });
       setConversation(d.conversation);
       initialized.current = true;
       setText("");
@@ -168,14 +169,28 @@ export default function LiveChat({ brand = "idesire" }: { brand?: Brand }) {
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Your name"
                   aria-label="Your name"
+                  autoComplete="name"
+                  required
+                />
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Phone or WhatsApp number"
+                  aria-label="Phone or WhatsApp number"
+                  autoComplete="tel"
+                  inputMode="tel"
+                  pattern="[+0-9 ()-]{10,20}"
+                  title="Enter a phone number with at least 10 digits"
                   required
                 />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Email for follow-up (optional)"
-                  aria-label="Email for follow-up"
+                  placeholder="Email (optional)"
+                  aria-label="Email (optional)"
+                  autoComplete="email"
                 />
               </>
             )}

@@ -30,7 +30,6 @@ const idesirePages = [
   ["about", "Our story", "/about"],
   ["contact", "Contact", "/contact"],
   ["wedding-orders", "Wedding orders", "/wedding-orders"],
-  ["customisation", "Customisation", "/customisation"],
   ["track-order", "Order tracking", "/track-order"],
   ["cart", "Shopping bag", "/cart"],
   ["account", "Customer account", "/account"],

@@ -708,12 +708,26 @@ export function adminAction(
     return o;
   }
   if (action === "saveEnquiry") {
+    if (Array.isArray(input.ids)) {
+      // Bulk status change from the enquiries register.
+      const status = required(input.status, "Status", 80);
+      if (!enquiryStatuses.includes(status)) throw new Error("Choose a valid enquiry status.");
+      const ids = new Set(input.ids.slice(0, 500).map(String));
+      let changed = 0;
+      for (const e of b.enquiries)
+        if (ids.has(e.id) && e.status !== status) { e.status = status; e.updatedAt = stamp(); changed++; }
+      return { changed };
+    }
     if (input.id) {
       const e = b.enquiries.find((v) => v.id === input.id);
       if (!e) throw new Error("Enquiry not found.");
-      const status = required(input.status, "Status", 80);
-      if (!enquiryStatuses.includes(status)) throw new Error("Choose a valid enquiry status.");
-      e.status = status;
+      if (input.status !== undefined) {
+        const status = required(input.status, "Status", 80);
+        if (!enquiryStatuses.includes(status)) throw new Error("Choose a valid enquiry status.");
+        e.status = status;
+      }
+      if (input.notes !== undefined) e.notes = text(input.notes, 5000);
+      e.updatedAt = stamp();
       return e;
     }
     return createEnquiry(b, brand, record(input.enquiry));

@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import { CmsHeading } from "./CmsPage";
 import Link from "next/link";
-import { api, useLocal } from "../lib/local/client";
+import { api, useLocal, whatsappNumber } from "../lib/local/client";
+import WhatsAppIcon from "./WhatsAppIcon";
 import { readBag, saveBag, type BagLine } from "../lib/local/bag";
 import { type Brand, productPath, homePath } from "../lib/local/types";
 import { naira } from "../lib/products";
@@ -61,6 +62,17 @@ export default function ShoppingBag({ brand }: { brand: Brand }) {
     const product = data.products.find(p => p.id === line.productId);
     return !product || !Number.isInteger(line.quantity) || line.quantity < product.minimum || line.quantity > (product.maximum ?? 100000);
   });
+  const shopName = brand === "kokies" ? "Kokies World of Gifts" : "iDesire TRADS";
+  const whatsapp = whatsappNumber(data?.settings.phone, brand === "kokies" ? "2349099591993" : "2348091142201");
+  // A ready-written message listing the bag, for customers who want to talk first.
+  const bagMessage = () => {
+    const items = lines.map((line) => {
+      const p = data?.products.find((x) => x.id === line.productId);
+      const unit = p?.unit === "yard" ? "yards" : "units";
+      return `- ${p?.name ?? line.productId}: ${line.quantity} ${unit}${line.colour ? `, ${line.colour}` : ""}${line.size ? `, ${line.size}` : ""}`;
+    });
+    return [`Hi ${shopName}, I'd like to order:`, ...items, "", "Could you confirm availability, delivery and the total?"].join("\n");
+  };
   const total = lines.reduce(
     (n, l) =>
       n +
@@ -79,7 +91,7 @@ export default function ShoppingBag({ brand }: { brand: Brand }) {
         <CmsHeading>
           {brand === "kokies" ? "Your gift bag." : "Your fabric bag."}
         </CmsHeading>
-        <p>Review your selection and place your order to continue on WhatsApp.</p>
+        <p>Review your selection, place your order, then confirm payment with us on WhatsApp.</p>
       </div>
       {recovering ? <p role="status">Checking for your saved receipt...</p> : order ? (
         <section className="track-card">
@@ -138,7 +150,11 @@ export default function ShoppingBag({ brand }: { brand: Brand }) {
                             ? "Price to quote"
                             : `${naira(p.price)} / ${p.unit}`}
                         </p>
-                        {p.price !== null && !p.sample && <p>{data?.inventory.find(i => i.productId === p.id)?.available ?? 0} {p.unit === "yard" ? "yards" : "units"} available</p>}
+                        {p.price !== null && !p.sample && (() => {
+                          const available = data?.inventory.find(i => i.productId === p.id)?.available ?? 0;
+                          const unit = p.unit === "yard" ? "yards" : "units";
+                          return <p className="stock-line">{available <= 0 ? "Sold out for now. We can quote a restock." : available < l.quantity ? `Only ${available} ${unit} available.` : "In stock"}</p>;
+                        })()}
                         {l.colour && <p>Colour: {l.colour}</p>}{l.size && <p>Size: {l.size}</p>}
                         {l.personalisation &&
                           l.personalisation.method !== "none" && (
@@ -247,9 +263,20 @@ export default function ShoppingBag({ brand }: { brand: Brand }) {
               <input name="phone" type="tel" autoComplete="tel" required />
             </label>
             <p><Link href={(brand === "kokies" ? homePath(brand) : "") + "/account"}>Sign in</Link> to save this order to your account, or continue as a guest.</p>
-            <label>Delivery method<select name="deliveryMethod" value={deliveryMethod} onChange={e => setDeliveryMethod(e.target.value)}><option value="delivery">Delivery</option><option value="pickup">Arrange pickup</option></select></label>
+            <fieldset className="choice-cards">
+              <legend>How would you like to receive it?</legend>
+              {[
+                ["delivery", "Delivery", "To your address. We confirm the fee before you pay."],
+                ["pickup", "Pickup", "Collect from us. We confirm the place and time."],
+              ].map(([value, title, hint]) => (
+                <label key={value} className="choice-card">
+                  <input type="radio" name="deliveryMethod" value={value} checked={deliveryMethod === value} onChange={() => setDeliveryMethod(value)} />
+                  <span><b>{title}</b><small>{hint}</small></span>
+                </label>
+              ))}
+            </fieldset>
             {deliveryMethod === "delivery" ? <label>Delivery address<textarea name="address" autoComplete="street-address" required /></label> :
-              <p>Our team will confirm the pickup location and time on WhatsApp.</p>}
+              <p className="choice-note">Our team will confirm the pickup location and time on WhatsApp.</p>}
             <label>
               Order notes / required date
               <textarea name="notes" />
@@ -260,25 +287,20 @@ export default function ShoppingBag({ brand }: { brand: Brand }) {
               <input type="checkbox" checked={quote} onChange={e => setQuote(e.target.checked)} />
               Request a quote instead. Your quantity exceeds current availability.
             </label>}
-            <fieldset className="checkout-payment">
-              <legend>Payment method</legend>
-              <div className="checkout-payment-active">
-                <strong>WhatsApp</strong>
-                <span>Available now</span>
-              </div>
-              <p>Place your order first, then continue with our team on WhatsApp.</p>
-              <div className="checkout-payment-options">
-                <button type="button" disabled>
-                  Paystack <span>Coming soon</span>
-                </button>
-                <button type="button" disabled>
-                  Flutterwave <span>Coming soon</span>
-                </button>
-              </div>
-            </fieldset>
+            <section className="checkout-steps" aria-labelledby="checkout-steps-title">
+              <h3 id="checkout-steps-title">How payment works</h3>
+              <ol>
+                <li><b>Place your order</b><span>You get a reference straight away{needsQuote || quote ? " and we prepare your quote" : " and we hold your items for 24 hours"}.</span></li>
+                <li><b>Confirm on WhatsApp</b><span>We confirm the total, including delivery, and send our bank details.</span></li>
+                <li><b>Pay by bank transfer</b><span>Once we confirm your payment, we start on your order.</span></li>
+              </ol>
+            </section>
             <button className="button button-dark full-button" disabled={busy || !data || invalidLines || (insufficient && !needsQuote && !quote)}>
-              {busy ? "Placing order…" : (needsQuote || quote ? "Request quote" : "Place order to continue")}
+              {busy ? "Placing order…" : (needsQuote || quote ? "Request my quote" : "Place order")}
             </button>
+            <a className="checkout-ask-whatsapp" href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(bagMessage())}`} target="_blank" rel="noopener noreferrer">
+              <WhatsAppIcon /> Prefer to talk first? Send this bag on WhatsApp
+            </a>
             {notice && <p role="alert">{notice}</p>}
           </form>
         </div>

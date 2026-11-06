@@ -40,6 +40,6 @@ export function OrderProgress({ receipt, brand }: {
       ))}
     </ol>}
     {receipt.items && <ul className="receipt-items">{receipt.items.map((item, index) => <li key={index}>{item.name} × {item.quantity}</li>)}</ul>}
-    {receipt.paymentStatus === "Unpaid" && <WhatsAppPayment brand={brand} reference={receipt.reference} status={receipt.status} />}
+    {receipt.paymentStatus === "Unpaid" && <WhatsAppPayment brand={brand} reference={receipt.reference} status={receipt.status} items={receipt.items} total={receipt.total} />}
   </>;
 }

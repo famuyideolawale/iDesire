@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 const origin = process.env.APP_ORIGIN || process.env.RENDER_EXTERNAL_URL || "http://localhost:2030";
 
 const staticPaths = [
-  "/", "/shop", "/new", "/wedding-orders", "/customisation", "/about", "/contact",
+  "/", "/shop", "/new", "/wedding-orders", "/about", "/contact",
   "/kokies-world-of-gift", "/kokies-world-of-gift/shop", "/kokies-world-of-gift/corporate-gifts",
   "/kokies-world-of-gift/personalisation", "/kokies-world-of-gift/about",
   "/kokies-world-of-gift/contact", "/kokies-world-of-gift/help",

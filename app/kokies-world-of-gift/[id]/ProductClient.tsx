@@ -3,6 +3,7 @@ import {api,useLocal} from '../../../lib/local/client';
 import {addToBag} from '../../../lib/local/bag';
 import {CmsHeading} from '../../../components/CmsPage';
 import Link from 'next/link';
+import WhatsAppIcon from '../../../components/WhatsAppIcon';
 import { ProductGallery, CataloguePhoto } from '../../../components/ProductGallery';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
@@ -109,13 +110,14 @@ export default function KokiesProductPage() {
             addToBag('kokies', {productId: String(product.id), quantity, personalisation});
             setNotice('Added to your gift bag. Open the bag to review your order.');
           }}>Add to gift bag</button>
-          <button type="button" disabled={!validQuantity} onClick={() => {
+          <div className="kwg-order-actions">
+          <button type="button" className="kwg-order-secondary" disabled={!validQuantity} onClick={() => {
             const personalisation = getPersonalisation();
             if (!personalisation) return;
             addToBag("kokies",{productId:String(product.id),quantity,size,personalisation});
             location.assign("/kokies-world-of-gift/cart");
           }}>Buy now</button>
-          <button type="button" disabled={!validQuantity} onClick={() => {
+          <button type="button" className="kwg-order-whatsapp-button" disabled={!validQuantity} onClick={() => {
             const personalisation = getPersonalisation();
             if (!personalisation) return;
             const lines = ["Hi Kokies, I'd like to order this gift:", product.name, "Product: " + (product.sku || product.id),
@@ -124,8 +126,9 @@ export default function KokiesProductPage() {
               product.quoteOnly || product.sample ? "Price: Please quote" : "Base subtotal: " + money(total) + (quote ? " (estimate)" : ""),
               "Please confirm availability, delivery and the final amount."];
             window.open("https://wa.me/" + whatsapp + "?text=" + encodeURIComponent(lines.filter(Boolean).join("\n")), "_blank", "noopener,noreferrer");
-          }}>Order via WhatsApp</button>
-          <Link href="/kokies-world-of-gift/cart">View gift bag &#8599;</Link>
+          }}><WhatsAppIcon /> Order on WhatsApp</button>
+          </div>
+          <Link className="kwg-view-bag" href="/kokies-world-of-gift/cart">View gift bag &#8599;</Link>
           <details className="kwg-order-disclosure" onToggle={e => setEnquiryOpen(e.currentTarget.open)}>
             <summary>Request a quote</summary>
             {enquiryOpen && <div className="kwg-order-fields">

@@ -20,6 +20,7 @@ import AccountManagement from "./AccountManagement";
 import { canManageAccounts } from "../lib/local/permissions";
 import { CampaignEditor } from "./admin/shared/CampaignEditor";
 import { InventoryWorkspace, CustomersWorkspace, SettingsWorkspace } from "./admin/shared/OperationsWorkspaces";
+import { EnquiriesWorkspace } from "./admin/shared/EnquiriesWorkspace";
 import { CollapsibleSection, DataList, Pagination, useDataPage } from "./admin/shared/Density";
 import AdminOverview from "./admin/shared/AdminOverview";
 import { AdminBadge, AdminSection, exportReport, orderChannel } from "./admin/shared/primitives";
@@ -35,10 +36,8 @@ const tabs = [
   "Overview",
   "Orders",
   "Quotes",
-  "Fulfilment",
   "Products",
   "Collections",
-  "Promotions",
   "Reports",
   "Inventory",
   "Customers",
@@ -53,8 +52,8 @@ const tabs = [
 // Sidebar groups, in display order. The tab names themselves are unchanged.
 const navGroups: [string, string[]][] = [
   ["", ["Overview"]],
-  ["Sales", ["Orders", "Quotes", "Fulfilment", "Reports"]],
-  ["Catalogue", ["Products", "Collections", "Promotions", "Inventory", "Media"]],
+  ["Sales", ["Orders", "Quotes", "Reports"]],
+  ["Catalogue", ["Products", "Collections", "Inventory", "Media"]],
   ["Customers", ["Customers", "Enquiries", "Live chat"]],
   ["Website", ["Page builder", "Settings"]],
   ["Team", ["Accounts", "Activity"]],
@@ -86,7 +85,7 @@ export default function BusinessAdmin({ brand }: { brand: Brand }) {
   const [initialSearch, setInitialSearch] = useState("");
   const orderSection = ["Orders", "Quotes", "Fulfilment"].includes(tab);
   const overview = tab === "Overview" || tab === "Reports";
-  const redesignedWorkspace = ["Inventory", "Customers", "Settings", "Accounts"].includes(tab);
+  const redesignedWorkspace = ["Inventory", "Customers", "Settings", "Accounts", "Enquiries"].includes(tab);
   const atelierOrders = !gift && orderSection && !!data;
   const go = (section: string, term = "", next = "") => {
     if (section !== tab) window.scrollTo({ top: 0, behavior: "instant" });
@@ -266,28 +265,25 @@ export default function BusinessAdmin({ brand }: { brand: Brand }) {
           )}
         </Link>
         <div className="desk-actions">
-          <label className="desk-brand-select">
-            Working in
-            <select
-              aria-label="Switch business workspace"
-              value={brand}
-              onChange={(e) =>
-                location.assign(
-                  e.target.value === "kokies" ? "/admin/kokies" : "/admin",
-                )
-              }
-            >
+          {session.brands.length > 1 ? (
+            <nav className="desk-brand-switch" aria-label="Switch business workspace">
               {session.brands.map((b) => (
-                <option key={b} value={b}>
-                  {brandNames[b]}
-                </option>
+                <a key={b} href={b === "kokies" ? "/admin/kokies" : "/admin"} aria-current={b === brand ? "page" : undefined}>
+                  {b === "kokies" ? "Kokies" : "iDesire"}
+                </a>
               ))}
-            </select>
-          </label>
-          <Link className="desk-button" href={homePath(brand)} target="_blank">
+            </nav>
+          ) : (
+            <span className="desk-brand-single">{brandNames[brand]}</span>
+          )}
+          <Link className="desk-button desk-view-site" href={homePath(brand)} target="_blank">
             View website ↗
           </Link>
-          <button onClick={() => void logout()}>Sign out</button>
+          <div className="desk-user" aria-label="Signed in account">
+            <span className="desk-user-initials" aria-hidden="true">{session.name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase()}</span>
+            <span className="desk-user-text"><b>{session.name}</b>{session.name !== session.role && <small>{session.role}</small>}</span>
+            <button type="button" onClick={() => void logout()}>Sign out</button>
+          </div>
         </div>
       </header>
       <div className="desk-layout">
@@ -340,7 +336,7 @@ export default function BusinessAdmin({ brand }: { brand: Brand }) {
                 submissions arrive here automatically. Payments are confirmed
                 manually.
               </p>}
-              {!atelierOrders && ["Products", "Orders", "Quotes", "Fulfilment", "Enquiries"].includes(
+              {!atelierOrders && ["Products", "Orders", "Quotes"].includes(
                 tab,
               ) && (
                 <input
@@ -358,11 +354,7 @@ export default function BusinessAdmin({ brand }: { brand: Brand }) {
                   return <button key={collection} onClick={() => go("Products", collection)}>{members[0]?.image && <img src={members[0].image} alt="" />}<strong>{collection}</strong><small>{members.length} products</small></button>;
                 })}</div>} />
               </AdminSection>}
-              {tab === "Promotions" && <AdminSection title="Sale pricing">
-                <p>Manage sale prices in the product catalogue. Active sale prices are used at checkout.</p>
-                <button className="desk-primary" onClick={() => go("Products")}>Manage product pricing</button>
-                <DataList data={data.products.filter(p => p.salePrice !== undefined && p.salePrice !== null)} label="Sale products" render={rows => <div>{rows.map(p => <div className="desk-row desk-log" key={p.id}><strong>{p.name}</strong><span>{naira(p.salePrice!)}</span><button onClick={() => go("Products",p.name)}>Open product</button></div>)}</div>} />
-              </AdminSection>}
+
               {tab === "Products" && (
                 <Products data={data} brand={brand} act={act} search={search} startNew={intent === "new"} />
               )}{" "}
@@ -377,12 +369,12 @@ export default function BusinessAdmin({ brand }: { brand: Brand }) {
                 <CustomersWorkspace data={data} brand={brand} act={act} busy={busy} error={error} search={search} setSearch={setSearch} openOrder={id => go("Orders", id)} />
               )}{" "}
               {tab === "Enquiries" && (
-                <Enquiries data={data} act={act} search={search} />
+                <EnquiriesWorkspace data={data} act={act} busy={busy} search={search} setSearch={setSearch} />
               )}{" "}
               {tab === "Live chat" && <Inbox data={data} act={act} />}{" "}
               {tab === "Page builder" && (
                 <><CampaignEditor data={data} brand={brand} save={act} /><VisualPageBuilder
-                  pages={data.pages}
+                  pages={data.pages.filter((p) => p.path !== "/customisation")}
                   sharedDraft={data.sharedDesign?.draft ?? []}
                   brand={brand}
                   act={act}
@@ -986,66 +978,6 @@ function OrderDetail({ order: o, act, brand, refresh }: { order: LocalOrder; act
     </>
   );
 }
-function Enquiries({
-  data,
-  act,
-  search,
-}: {
-  data: DeskData;
-  act: Act;
-  search: string;
-}) {
-  return (
-    <DataList data={data.enquiries.filter(e => JSON.stringify(e).toLowerCase().includes(search.toLowerCase()))} label="Enquiries" limit={8} resetKey={search} render={rows => <div className="desk-two">{rows.map(e => (
-          <article className="desk-card" key={e.id}>
-            <div className="desk-row">
-              <h2>{e.customerName}</h2>
-              <Badge>
-                {e.status}
-                {e.demo ? " · Demo" : ""}
-              </Badge>
-            </div>
-            <small>
-              {e.id} · {fmt(e.createdAt)}
-            </small>
-            <h3>{e.type}</h3>
-            <p style={{ whiteSpace: "pre-line" }}>{e.details}</p>
-            <p>
-              {e.email}
-              <br />
-              {e.phone}
-            </p>
-            <form
-              onSubmit={(v) => {
-                v.preventDefault();
-                void act({
-                  action: "saveEnquiry",
-                  id: e.id,
-                  status: new FormData(v.currentTarget).get("status"),
-                });
-              }}
-            >
-              <label>
-                Status
-                <select name="status" defaultValue={e.status}>
-                  {[
-                    "New",
-                    "Contacted",
-                    "Quote sent",
-                    "Awaiting response",
-                    "Converted",
-                    "Closed",
-                  ].map((s) => (
-                    <option key={s}>{s}</option>
-                  ))}
-                </select>
-              </label>
-              <button>Update enquiry</button>
-            </form>
-          </article>
-        ))}</div>} />
-  );
-}
 function Inbox({ data, act }: { data: DeskData; act: Act }) {
   const [id, setId] = useState(""),
     [filter, setFilter] = useState("All");
@@ -1118,9 +1050,13 @@ function ChatDetail({
   return (
     <>
       <h2>{c.name}</h2>
-      <p>{c.email || "Visitor has not shared an email."}</p>
+      <p className="desk-chat-contact">
+        {c.phone && <a href={`tel:${c.phone}`}>{c.phone}</a>}
+        {c.phone && <a href={`https://wa.me/${c.phone.replace(/\D/g, "").replace(/^0(?=\d{10}$)/, "234")}`} target="_blank" rel="noreferrer">WhatsApp ↗</a>}
+        {c.email ? <a href={`mailto:${c.email}`}>{c.email}</a> : !c.phone && <span>No contact details shared.</span>}
+      </p>
       <small>{data.user.brands.length === 1 ? brandNames[data.user.brands[0]] : "Current brand inbox"}</small>
-      {c.email && <div>{data.orders.filter(o => o.email.toLowerCase() === c.email.toLowerCase()).slice(0,3).map(o => <p key={o.id}>{o.id} · {o.status}</p>)}</div>}
+      {(c.email || c.phone) && <div>{data.orders.filter(o => (c.email && o.email.toLowerCase() === c.email.toLowerCase()) || (c.phone && o.phone.replace(/\D/g, "").slice(-10) === c.phone.replace(/\D/g, "").slice(-10))).slice(0,3).map(o => <p key={o.id}>{o.id} · {o.status}</p>)}</div>}
       <DataList data={[...c.messages].reverse()} label="Messages, newest first" limit={15} resetKey={c.id} render={rows => <div className="desk-chat-thread">
         {[...rows].reverse().map((m) => (
           <article key={m.id} className={`desk-message ${m.from}`}>
