@@ -25,7 +25,26 @@ p { text-wrap: pretty; }
 .brand-directory > a { min-height: 34px; padding-top: 8px; padding-bottom: 8px; }
 .brand-directory a b, .brand-directory a small { font-size: 11px; letter-spacing: 0.01em; }
 @media (max-width: 700px) {
-  .brand-directory { display: none !important; }
+  /* Phones: both businesses stay visible at the top, as one slim row. */
+  .brand-directory { display: grid !important; grid-template-columns: 1fr 1fr; gap: 6px; padding: 6px 12px; }
+  .brand-directory > a {
+    min-height: 38px !important; padding: 6px 10px !important; gap: 6px;
+    justify-content: center; text-align: center; border-radius: 999px;
+  }
+  .brand-directory > a > span { flex: initial; }
+  .brand-directory a b { display: inline !important; font-size: 12px !important; line-height: 1.2 !important; }
+  .brand-directory a small { display: none !important; }
+  .brand-directory > a > svg { display: block !important; width: 13px; height: 13px; margin: 0; }
+  .brand-directory > a[aria-current], .brand-directory > a.directory-kokies[aria-current] { box-shadow: none !important; }
+  /* The other business is a light pill, so it reads as "go to" rather than "you are here". */
+  .brand-directory > a:not([aria-current]) { background: #fffaf4 !important; color: #4b1922 !important; border: 1px solid #e3cfc8 !important; }
+}
+@media (max-width: 700px) { .brand-directory a b { white-space: nowrap; } }
+@media (max-width: 380px) {
+  .brand-directory { gap: 5px; padding: 6px 8px; }
+  .brand-directory > a { padding: 6px 7px !important; gap: 4px; }
+  .brand-directory a b { font-size: 11px !important; }
+  .brand-directory > a > svg { width: 11px; height: 11px; }
 }
 .idesire-site .site-header nav .mobile-sister-link,
 .kokies-header nav .mobile-sister-link { display: none; }
