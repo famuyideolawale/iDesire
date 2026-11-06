@@ -2,7 +2,8 @@ import type { Brand, LocalOrder } from "../lib/local/types";
 import { naira } from "../lib/products";
 import { WhatsAppPayment } from "./WhatsAppPayment";
 
-export type Receipt = Pick<LocalOrder, "status" | "paymentStatus" | "total" | "updatedAt" | "deliveryFee" | "quoteIssuedAt" | "holdUntil"> & {
+export type Receipt = Pick<LocalOrder, "status" | "paymentStatus" | "total" | "updatedAt" | "deliveryFee" | "quoteIssuedAt" | "holdUntil" | "deliveryPending"> & {
+  deliveryPlace?: string;
   reference: string;
   hasArtwork?: boolean;
   proof?: { id: string; approvedAt?: string };
@@ -27,7 +28,8 @@ export function OrderProgress({ receipt, brand }: {
   const step = stages.findIndex(([, status]) => status === receipt.status);
   return <>
     <p><strong>{receipt.status}</strong> · Payment {receipt.paymentStatus.toLowerCase()}</p>
-    {receipt.total !== undefined && <p>{receipt.status === "Awaiting quotation" ? "Base estimate" : "Order total"}: <strong>{naira(receipt.total)}</strong></p>}
+    {receipt.total !== undefined && <p>{receipt.status === "Awaiting quotation" ? "Base estimate" : "Order total"}: <strong>{naira(receipt.total)}</strong>
+      {receipt.deliveryPlace && receipt.status !== "Awaiting quotation" && <> · {receipt.deliveryPlace === "Pickup" ? "pickup" : receipt.deliveryPending ? `delivery to ${receipt.deliveryPlace} to confirm` : `includes ${naira(receipt.deliveryFee ?? 0)} delivery to ${receipt.deliveryPlace}`}</>}</p>}
     {receipt.quoteIssuedAt && <p>Final quote issued {new Date(receipt.quoteIssuedAt).toLocaleDateString()}. Delivery: {naira(receipt.deliveryFee ?? 0)}.</p>}
     {receipt.holdUntil && <p>Stock held until {new Date(receipt.holdUntil).toLocaleString()}.</p>}
     {receipt.paymentStatus === "Unpaid" && receipt.status === "Awaiting payment" && !receipt.holdUntil && (
@@ -40,6 +42,7 @@ export function OrderProgress({ receipt, brand }: {
       ))}
     </ol>}
     {receipt.items && <ul className="receipt-items">{receipt.items.map((item, index) => <li key={index}>{item.name} × {item.quantity}</li>)}</ul>}
-    {receipt.paymentStatus === "Unpaid" && <WhatsAppPayment brand={brand} reference={receipt.reference} status={receipt.status} items={receipt.items} total={receipt.total} />}
+    {receipt.paymentStatus === "Unpaid" && <WhatsAppPayment brand={brand} reference={receipt.reference} status={receipt.status} items={receipt.items} total={receipt.total}
+      deliveryFee={receipt.deliveryFee} deliveryPending={receipt.deliveryPending} deliveryPlace={receipt.deliveryPlace} />}
   </>;
 }

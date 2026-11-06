@@ -227,3 +227,18 @@ p { text-wrap: pretty; }
   background: #fffdf9; font: 500 14px/1 'DM Sans', sans-serif;
 }
 .shopping-bag .bag-item .stock-line { font-size: 13px; color: #4f6b4f; }
+
+/* ---------- Checkout: delivery location and order summary ---------- */
+.delivery-location { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.delivery-location label { margin: 0; }
+.delivery-location select { width: 100%; }
+@media (max-width: 420px) { .delivery-location { grid-template-columns: 1fr; } }
+.order-summary { margin: 6px 0 2px; padding: 16px 18px; border-radius: 14px; background: #fff; border: 1px solid #ecdcd4; display: grid; gap: 10px; }
+.order-summary div { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.order-summary dt { font-size: 14px; color: #6f605d; margin: 0; }
+.order-summary dd { margin: 0; font-size: 14px; font-weight: 600; text-align: right; color: #2e1d20; }
+.order-summary-total { border-top: 1px solid #ecdcd4; padding-top: 12px; }
+.order-summary-total dt { color: #2e1d20; font-weight: 700; font-size: 15px; }
+.order-summary-total dd { font-size: 20px; color: #800020; }
+.kokies-site .order-summary-total dd { color: #74333a; }
+.order-summary p { margin: 0; font-size: 12.5px; line-height: 1.5; color: #7b6c69; }

@@ -27,6 +27,8 @@ function orderStatus(o: LocalOrder) {
     hasArtwork: !!o.artwork,
     proof: o.proof && { id: o.proof.id, approvedAt: o.proof.approvedAt },
     deliveryFee: o.deliveryFee,
+    deliveryPending: o.deliveryPending,
+    deliveryPlace: o.deliveryMethod === "pickup" ? "Pickup" : o.deliveryArea ? `${o.deliveryArea}, Abuja` : o.deliveryState,
     holdUntil: holdExpired(o) ? undefined : o.holdUntil,
     items: o.items.map(i => ({ name: i.name, quantity: i.quantity })),
     updatedAt: o.updatedAt,

@@ -27,6 +27,8 @@ export type LocalProduct = {
   status: "published" | "draft";
   sample?: boolean;
   priceConfirmed?: boolean;
+  /** Extra delivery charge for this product, added once per order when delivered. */
+  deliveryFee?: number | null;
   sku?: string;
   collection?: string;
   sizes?: string[];
@@ -65,6 +67,10 @@ export type LocalOrder = {
   id: string;
   customerName: string;
   deliveryMethod?: "delivery" | "pickup";
+  deliveryState?: string;
+  deliveryArea?: string;
+  /** True when the delivery fee for the chosen place still has to be confirmed. */
+  deliveryPending?: boolean;
   phone: string;
   email: string;
   address: string;
@@ -208,6 +214,7 @@ export type StoreSettings = {
   openingHours: string;
   chatWelcome: string;
   chatOnline: boolean;
+  delivery?: import("../delivery").DeliverySettings;
 };
 export type Media = {
   id: string;

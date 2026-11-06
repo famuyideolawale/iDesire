@@ -4,6 +4,7 @@ import { CmsHeading } from "./CmsPage";
 import Link from "next/link";
 import { api, useLocal, whatsappNumber } from "../lib/local/client";
 import WhatsAppIcon from "./WhatsAppIcon";
+import { ABUJA, abujaAreas, deliveryQuote, lineNeedsQuote, nigerianStates } from "../lib/delivery";
 import { readBag, saveBag, type BagLine } from "../lib/local/bag";
 import { type Brand, productPath, homePath } from "../lib/local/types";
 import { naira } from "../lib/products";
@@ -18,7 +19,9 @@ export default function ShoppingBag({ brand }: { brand: Brand }) {
     [recovering, setRecovering] = useState(true),
     [quote, setQuote] = useState(false);
   const submitting = useRef(false);
-  const [deliveryMethod, setDeliveryMethod] = useState("delivery");
+  const [deliveryMethod, setDeliveryMethod] = useState<"delivery" | "pickup">("delivery");
+  const [deliveryState, setDeliveryState] = useState("");
+  const [deliveryArea, setDeliveryArea] = useState("");
   const checkoutStorage = "checkout-receipt-" + brand;
   useEffect(() => {
     let active = true;
@@ -48,13 +51,12 @@ export default function ShoppingBag({ brand }: { brand: Brand }) {
     saveBag(brand, next);
     setLines(next);
   };
-  const needsQuote = lines.some(line => {
-    const product = data?.products.find(p => p.id === line.productId);
-    return product?.price === null || product?.sample || product?.availability === "made" || product?.availability === "preorder" || (brand === "kokies" && product?.priceConfirmed !== true) ||
-      (line.personalisation?.method && line.personalisation.method !== "none") ||
-      (!!line.personalisation?.productColour && line.personalisation.productColour !== "As pictured");
-  });
+  const needsQuote = lines.some(line =>
+    lineNeedsQuote(data?.products.find(p => p.id === line.productId), line));
   const insufficient = lines.some(line => {
+    const product = data?.products.find(p => p.id === line.productId);
+    // Made-to-order, pre-order and concept items are produced on demand.
+    if (product && (product.sample || product.availability === "made" || product.availability === "preorder")) return false;
     const available = data?.inventory.find(i => i.productId === line.productId)?.available ?? 0;
     return lines.filter(item => item.productId === line.productId).reduce((sum, item) => sum + item.quantity, 0) > available;
   });
@@ -71,15 +73,19 @@ export default function ShoppingBag({ brand }: { brand: Brand }) {
       const unit = p?.unit === "yard" ? "yards" : "units";
       return `- ${p?.name ?? line.productId}: ${line.quantity} ${unit}${line.colour ? `, ${line.colour}` : ""}${line.size ? `, ${line.size}` : ""}`;
     });
-    return [`Hi ${shopName}, I'd like to order:`, ...items, "", "Could you confirm availability, delivery and the total?"].join("\n");
+    const deliveryLine = deliveryMethod === "pickup" ? "Pickup"
+      : delivery.place ? `Delivery to ${delivery.place}: ${delivery.fee !== null ? naira(delivery.fee) : "fee to confirm"}` : "Delivery: location to confirm";
+    const money = needsQuote || quote ? [deliveryLine, "", "Could you send me a quote?"]
+      : [`Subtotal: ${naira(subtotal)}`, deliveryLine, `Total: ${naira(total)}${delivery.fee === null && deliveryMethod === "delivery" ? " + delivery" : ""}`, "", "Could you confirm availability and send payment details?"];
+    return [`Hi ${shopName}, I'd like to order:`, ...items, "", ...money].join("\n");
   };
-  const total = lines.reduce(
-    (n, l) =>
-      n +
-      (data?.products.find((p) => p.id === l.productId)?.price || 0) *
-        l.quantity,
+  const subtotal = lines.reduce(
+    (n, l) => n + (data?.products.find((p) => p.id === l.productId)?.price || 0) * l.quantity,
     0,
   );
+  const delivery = deliveryQuote(data?.settings.delivery, data?.products ?? [], lines, deliveryMethod, deliveryState, deliveryArea);
+  const locationChosen = deliveryMethod === "pickup" || (!!deliveryState && (deliveryState !== ABUJA || !!deliveryArea));
+  const total = subtotal + (delivery.fee ?? 0);
   return (
     <div
       className={`page-shell shopping-bag ${brand === "kokies" ? "kokies-bag" : ""}`}
@@ -245,11 +251,6 @@ export default function ShoppingBag({ brand }: { brand: Brand }) {
             }}
           >
             <h2>Your details</h2>
-            <h3>{needsQuote || quote ? "Base estimate" : "Subtotal"} {naira(total)}</h3>
-            <p>
-              Quoted products, personalisation and delivery are confirmed
-              separately.
-            </p>
             <label>
               Your name
               <input name="customerName" autoComplete="name" required />
@@ -266,17 +267,39 @@ export default function ShoppingBag({ brand }: { brand: Brand }) {
             <fieldset className="choice-cards">
               <legend>How would you like to receive it?</legend>
               {[
-                ["delivery", "Delivery", "To your address. We confirm the fee before you pay."],
-                ["pickup", "Pickup", "Collect from us. We confirm the place and time."],
+                ["delivery", "Delivery", "To your address. The fee is added once you choose your location."],
+                ["pickup", "Pickup", "Collect from us at no charge. We confirm the place and time."],
               ].map(([value, title, hint]) => (
                 <label key={value} className="choice-card">
-                  <input type="radio" name="deliveryMethod" value={value} checked={deliveryMethod === value} onChange={() => setDeliveryMethod(value)} />
+                  <input type="radio" name="deliveryMethod" value={value} checked={deliveryMethod === value} onChange={() => setDeliveryMethod(value as "delivery" | "pickup")} />
                   <span><b>{title}</b><small>{hint}</small></span>
                 </label>
               ))}
             </fieldset>
-            {deliveryMethod === "delivery" ? <label>Delivery address<textarea name="address" autoComplete="street-address" required /></label> :
-              <p className="choice-note">Our team will confirm the pickup location and time on WhatsApp.</p>}
+            {deliveryMethod === "delivery" ? <>
+              <div className="delivery-location">
+                <label>State
+                  <select name="deliveryState" required value={deliveryState} onChange={e => { setDeliveryState(e.target.value); setDeliveryArea(""); }}>
+                    <option value="" disabled>Choose a state</option>
+                    {nigerianStates.map(state => <option key={state}>{state}</option>)}
+                  </select>
+                </label>
+                {deliveryState === ABUJA && <label>Area in Abuja
+                  <select name="deliveryArea" required value={deliveryArea} onChange={e => setDeliveryArea(e.target.value)}>
+                    <option value="" disabled>Choose your area</option>
+                    {abujaAreas.map(area => <option key={area}>{area}</option>)}
+                  </select>
+                </label>}
+              </div>
+              <label>Delivery address<textarea name="address" autoComplete="street-address" required placeholder="House number, street and nearest landmark" /></label>
+            </> : <p className="choice-note">Our team will confirm the pickup location and time on WhatsApp.</p>}
+            <dl className="order-summary" aria-live="polite">
+              <div><dt>Subtotal</dt><dd>{needsQuote || quote ? "To quote" : naira(subtotal)}</dd></div>
+              <div><dt>{deliveryMethod === "pickup" ? "Pickup" : delivery.place ? `Delivery to ${delivery.place}` : "Delivery"}</dt>
+                <dd>{deliveryMethod === "pickup" ? "Free" : !locationChosen ? "Choose your location" : delivery.fee === null ? "Confirmed on WhatsApp" : naira(delivery.fee)}</dd></div>
+              {!(needsQuote || quote) && <div className="order-summary-total"><dt>Total</dt><dd>{naira(total)}{deliveryMethod === "delivery" && locationChosen && delivery.fee === null ? " + delivery" : ""}</dd></div>}
+              {(needsQuote || quote) && <p>Some items need a price from our team (custom artwork, extra wording or a custom colour). We will send your full quote on WhatsApp.</p>}
+            </dl>
             <label>
               Order notes / required date
               <textarea name="notes" />
@@ -291,7 +314,7 @@ export default function ShoppingBag({ brand }: { brand: Brand }) {
               <h3 id="checkout-steps-title">How payment works</h3>
               <ol>
                 <li><b>Place your order</b><span>You get a reference straight away{needsQuote || quote ? " and we prepare your quote" : " and we hold your items for 24 hours"}.</span></li>
-                <li><b>Confirm on WhatsApp</b><span>We confirm the total, including delivery, and send our bank details.</span></li>
+                <li><b>Confirm on WhatsApp</b><span>{needsQuote || quote ? "We send your quote, including delivery, with our bank details." : "We confirm availability and send our bank details for the total above."}</span></li>
                 <li><b>Pay by bank transfer</b><span>Once we confirm your payment, we start on your order.</span></li>
               </ol>
             </section>

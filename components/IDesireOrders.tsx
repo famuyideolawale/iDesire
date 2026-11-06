@@ -285,6 +285,7 @@ function OrderDetail({ order, busy, act, open, go, customers }: {
             {order.phone && <span><Phone size={13} /> {order.phone}</span>}
             {order.email && <span><Mail size={13} /> {order.email}</span>}
             {order.deliveryMethod === "pickup" && <span>Customer pickup</span>}
+            {order.deliveryMethod !== "pickup" && order.deliveryState && <span className="ops-delivery-line">Delivery to {order.deliveryArea ? `${order.deliveryArea}, Abuja` : order.deliveryState} · {order.deliveryPending ? "fee to confirm (use Issue / Revise Quote)" : naira(order.deliveryFee ?? 0)}</span>}
             {order.address && <details><summary>Delivery address</summary><p>{order.address}</p></details>}
             {customer && <button type="button" onClick={() => go("Customers", customer.email || customer.phone)}>Customer history</button>}
           </div>

@@ -15,6 +15,7 @@ import type {
   StoreDatabase,
 } from "./types";
 import { effectivePrice, orderStatuses } from "./types";
+import { ABUJA, abujaAreas, cleanDeliverySettings, deliveryQuote, lineNeedsQuote, nigerianStates } from "../delivery";
 const stamp = () => new Date().toISOString();
 export const enquiryStatuses = ["New", "Contacted", "Quote sent", "Awaiting response", "Converted", "Closed"];
 const MAX_MOVEMENTS = 250;
@@ -203,16 +204,25 @@ export function createOrder(
   });
   const quote =
     input.kind === "enquiry" ||
-    items.some(i => {
-      const product = b.products.find(p => p.id === i.productId);
-      return product?.sample || product?.availability === "made" || product?.availability === "preorder" || (brand === "kokies" && !manual && product?.priceConfirmed !== true);
-    }) ||
-    items.some(
-      (i) =>
-        i.unitPrice === null ||
-        (i.personalisation && (i.personalisation.method !== "none" ||
-          (!!i.personalisation.productColour && i.personalisation.productColour !== "As pictured"))),
-    );
+    items.some((i) => {
+      const product = b.products.find((p) => p.id === i.productId);
+      return lineNeedsQuote(product && { ...product, price: i.unitPrice }, i);
+    });
+  // Delivery is priced on the server from the admin's fee table, never from the browser.
+  let deliveryState = "", deliveryArea = "";
+  if (deliveryMethod === "delivery") {
+    deliveryState = text(input.deliveryState, 60);
+    deliveryArea = deliveryState === ABUJA ? text(input.deliveryArea, 60) : "";
+    if (!manual && !(nigerianStates as readonly string[]).includes(deliveryState))
+      throw new Error("Choose the state for delivery.");
+    if (!manual && deliveryState === ABUJA && !(abujaAreas as readonly string[]).includes(deliveryArea))
+      throw new Error("Choose your area in Abuja.");
+  }
+  const delivery = deliveryQuote(
+    b.settings.delivery, b.products, items, deliveryMethod, deliveryState, deliveryArea,
+  );
+  const deliveryFee = delivery.fee ?? undefined;
+  const subtotal = items.reduce((n, i) => n + (i.unitPrice ?? 0) * i.quantity, 0);
   const order: LocalOrder = {
     id: `${brand === "idesire" ? "IDT" : "KOK"}-${new Date().getUTCFullYear()}-${randomBytes(10).toString("hex").toUpperCase()}`,
     customerName,
@@ -221,7 +231,11 @@ export function createOrder(
     address,
     deliveryMethod,
     items,
-    total: items.reduce((n, i) => n + (i.unitPrice ?? 0) * i.quantity, 0),
+    total: subtotal + (deliveryFee ?? 0),
+    deliveryFee,
+    deliveryState: deliveryState || undefined,
+    deliveryArea: deliveryArea || undefined,
+    deliveryPending: deliveryMethod === "delivery" && deliveryFee === undefined ? true : undefined,
     status: quote ? "Awaiting quotation" : "Awaiting payment",
     paymentStatus: "Unpaid",
     source: manual ? (["WhatsApp", "Manual", "Admin"].includes(String(input.source)) ? String(input.source) : "Admin") : "Website",
@@ -234,7 +248,10 @@ export function createOrder(
         actor,
         text: quote
           ? "Order enquiry received; final quote required."
-          : "Order placed; payment not yet confirmed.",
+          : "Order placed; payment not yet confirmed." +
+            (deliveryMethod === "pickup" ? " Pickup." : deliveryFee !== undefined
+              ? ` Delivery to ${delivery.place}: ₦${deliveryFee.toLocaleString("en-NG")}.`
+              : ` Delivery to ${delivery.place || "the customer"}: fee to confirm.`),
       },
     ],
     reserved: false,
@@ -471,6 +488,8 @@ export function adminAction(
     else p.maximum = existing?.maximum;
     p.availability = x.availability === "made" || x.availability === "preorder" ? x.availability : "stock";
     p.leadTime = text(x.leadTime, 150);
+    p.deliveryFee = x.deliveryFee === undefined ? existingProduct?.deliveryFee
+      : x.deliveryFee === "" || x.deliveryFee === null ? null : positive(x.deliveryFee, 0, 10_000_000);
     p.seoTitle = text(x.seoTitle, 120);
     p.seoDescription = text(x.seoDescription, 300);
     p.featured = x.featured === true;
@@ -569,6 +588,8 @@ export function adminAction(
       throw new Error("Only an unpaid order awaiting payment can be confirmed.");
     if (needsFinalQuote(order) || order.items.some(i => i.unitPrice === null))
       throw new Error("Issue the final quote first.");
+    if (order.deliveryPending)
+      throw new Error("Set the delivery fee first with Issue / revise quote.");
     const amount = positive(typeof input.amount === "number" ? input.amount : required(input.amount, "Amount received"), 0, Number.MAX_SAFE_INTEGER / 100);
     if (Math.round(amount * 100) !== Math.round(order.total * 100))
       throw new Error("The received amount must match the agreed total.");
@@ -684,6 +705,7 @@ export function adminAction(
     o.status = "Awaiting payment";
     o.quoteIssuedAt = stamp();
     o.deliveryFee = delivery;
+    delete o.deliveryPending;
     // Hold the stock for the quoted items so a paying customer is never blocked.
     // reserve() throws a clear message when stock is short, before anything is saved.
     reserve(b, o, actor);
@@ -772,6 +794,10 @@ export function adminAction(
     if (!slides.some(slide => slide.visible)) throw new Error("Keep at least one campaign visible.");
     b.settings.heroSlides = slides;
     return slides;
+  }
+  if (action === "saveDelivery") {
+    b.settings.delivery = cleanDeliverySettings(input.delivery);
+    return b.settings.delivery;
   }
   if (action === "saveSettings") {
     const x = record(input.settings);

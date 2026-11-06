@@ -10,12 +10,18 @@ export function WhatsAppPayment({
   status,
   items = [],
   total,
+  deliveryFee,
+  deliveryPending,
+  deliveryPlace,
 }: {
   brand: Brand;
   reference: string;
   status: string;
   items?: { name: string; quantity: number }[];
   total?: number;
+  deliveryFee?: number;
+  deliveryPending?: boolean;
+  deliveryPlace?: string;
 }) {
   const { data } = useLocal();
   const quote = status === "Awaiting quotation";
@@ -29,9 +35,13 @@ export function WhatsAppPayment({
   const number = /^[1-9]\d{7,14}$/.test(international) ? international : defaultPhone;
   const request = quote
     ? "Could you share my final quote, including delivery?"
-    : "Could you confirm the amount due, including delivery, and send the payment instructions?";
+    : "Please send your bank details so I can pay.";
   const summary = items.map((item) => `- ${item.name} × ${item.quantity}`).join("\n");
-  const amount = !quote && total ? `Order total before delivery: ₦${total.toLocaleString("en-NG")}` : "";
+  const n = (v: number) => "₦" + v.toLocaleString("en-NG");
+  const deliveryText = !deliveryPlace ? "" : deliveryPlace === "Pickup" ? "Pickup"
+    : deliveryPending || deliveryFee === undefined ? `Delivery to ${deliveryPlace}: fee to confirm` : `Delivery to ${deliveryPlace}: ${n(deliveryFee)}`;
+  const amount = quote || !total ? deliveryText
+    : [deliveryText, `Total: ${n(total)}${deliveryPending ? " + delivery" : ""}`].filter(Boolean).join("\n");
   const message = [`Hi ${name},`, `Order reference: ${reference}`, summary, amount, request].filter(Boolean).join("\n\n");
 
   return (

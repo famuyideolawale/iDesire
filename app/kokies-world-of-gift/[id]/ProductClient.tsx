@@ -4,6 +4,7 @@ import {addToBag} from '../../../lib/local/bag';
 import {CmsHeading} from '../../../components/CmsPage';
 import Link from 'next/link';
 import WhatsAppIcon from '../../../components/WhatsAppIcon';
+import { lineNeedsQuote } from '../../../lib/delivery';
 import { ProductGallery, CataloguePhoto } from '../../../components/ProductGallery';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
@@ -46,7 +47,8 @@ export default function KokiesProductPage() {
   const stock = data?.inventory.find(i => i.productId === String(product.id))?.available;
   const phoneDigits = (data?.settings.phone || "").replace(/\D/g, "").replace(/^00/, "").replace(/^0(?=\d{10}$)/,"234");
   const whatsapp = /^[1-9]\d{7,14}$/.test(phoneDigits) ? phoneDigits : "2349099591993";
-  const quote = product.quoteOnly || product.sample || !product.priceConfirmed || product.availability === "made" || product.availability === "preorder" || method !== "none" || selectedProductColour !== "As pictured";
+  const quote = lineNeedsQuote({ price: product.quoteOnly ? null : product.price, sample: product.sample, colours: product.colours },
+    { personalisation: { method, extraWords, productColour: selectedProductColour } });
   const total = (validQuantity ? quantity : minimum) * product.price;
 
   function getPersonalisation(): GiftPersonalisation | null {
@@ -79,7 +81,7 @@ export default function KokiesProductPage() {
 
   return <div className="kwg-detail-shell" data-cms-product={String(product.id)}><div className="kwg-breadcrumb"><Link href="/kokies-world-of-gift/shop">The Kokies gift shop</Link><span>/</span><span>{product.category}</span></div>
     <div className="kwg-detail-grid"><div className="kwg-detail-image"><ProductGallery src={product.colours?.find(c=>c.name===selectedProductColour)?.image || product.image} alt={product.name} photos={product.gallery} /></div>
-      <div className="kwg-detail-copy"><span className="kokies-eyebrow">{product.category}</span><CmsHeading>{product.name}</CmsHeading><p>{product.note}</p>{product.sourceUrl && <a className="kwg-inspiration-link" href={product.sourceUrl} target="_blank" rel="noreferrer">See the inspiration on Kokies’ Instagram ↗</a>}<strong className="kwg-detail-price">{product.quoteOnly || product.sample ? 'Request a quote':money(product.price)} {!product.quoteOnly && !product.sample && <small>{product.priceConfirmed && !product.sample ? 'per unit' : 'per unit, from · final price confirmed in your quote'}</small>}</strong><p className="kwg-order-minimum">Minimum order: {minimum} units · {product.availability === "made" ? "Made to order" : product.availability === "preorder" ? "Pre-order" : stock === undefined ? "Availability to confirm" : stock + " units available"}</p>
+      <div className="kwg-detail-copy"><span className="kokies-eyebrow">{product.category}</span><CmsHeading>{product.name}</CmsHeading><p>{product.note}</p>{product.sourceUrl && <a className="kwg-inspiration-link" href={product.sourceUrl} target="_blank" rel="noreferrer">See the inspiration on Kokies’ Instagram ↗</a>}<strong className="kwg-detail-price">{product.quoteOnly || product.sample ? 'Request a quote':money(product.price)} {!product.quoteOnly && !product.sample && <small>per unit</small>}</strong><p className="kwg-order-minimum">Minimum order: {minimum} units · {product.availability === "made" ? "Made to order" : product.availability === "preorder" ? "Pre-order" : stock === undefined ? "Availability to confirm" : stock + " units available"}</p>
       {product.leadTime && <p>Lead time: {product.leadTime}</p>}
         <form className="kwg-order-form" onSubmit={submitOrder} onInvalidCapture={e => {
           const section = (e.target as HTMLElement).closest('details');
@@ -123,7 +125,8 @@ export default function KokiesProductPage() {
             const lines = ["Hi Kokies, I'd like to order this gift:", product.name, "Product: " + (product.sku || product.id),
               "Quantity: " + quantity, "Colour: " + selectedProductColour, size ? "Size: " + size : "",
               method !== "none" ? "Personalisation: " + method + (wording ? " · " + wording : "") : "",
-              product.quoteOnly || product.sample ? "Price: Please quote" : "Base subtotal: " + money(total) + (quote ? " (estimate)" : ""),
+              product.quoteOnly || product.sample ? "Price: Please quote" : "Subtotal: " + money(total) + (quote ? " (personalisation to quote)" : ""),
+              "Delivery: please confirm the fee to my location",
               "Please confirm availability, delivery and the final amount."];
             window.open("https://wa.me/" + whatsapp + "?text=" + encodeURIComponent(lines.filter(Boolean).join("\n")), "_blank", "noopener,noreferrer");
           }}><WhatsAppIcon /> Order on WhatsApp</button>

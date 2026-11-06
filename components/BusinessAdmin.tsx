@@ -21,6 +21,7 @@ import { canManageAccounts } from "../lib/local/permissions";
 import { CampaignEditor } from "./admin/shared/CampaignEditor";
 import { InventoryWorkspace, CustomersWorkspace, SettingsWorkspace } from "./admin/shared/OperationsWorkspaces";
 import { EnquiriesWorkspace } from "./admin/shared/EnquiriesWorkspace";
+import { DeliveryFeesWorkspace } from "./admin/shared/DeliveryFees";
 import { CollapsibleSection, DataList, Pagination, useDataPage } from "./admin/shared/Density";
 import AdminOverview from "./admin/shared/AdminOverview";
 import { AdminBadge, AdminSection, exportReport, orderChannel } from "./admin/shared/primitives";
@@ -36,6 +37,7 @@ const tabs = [
   "Overview",
   "Orders",
   "Quotes",
+  "Delivery",
   "Products",
   "Collections",
   "Reports",
@@ -52,7 +54,7 @@ const tabs = [
 // Sidebar groups, in display order. The tab names themselves are unchanged.
 const navGroups: [string, string[]][] = [
   ["", ["Overview"]],
-  ["Sales", ["Orders", "Quotes", "Reports"]],
+  ["Sales", ["Orders", "Quotes", "Delivery", "Reports"]],
   ["Catalogue", ["Products", "Collections", "Inventory", "Media"]],
   ["Customers", ["Customers", "Enquiries", "Live chat"]],
   ["Website", ["Page builder", "Settings"]],
@@ -85,7 +87,7 @@ export default function BusinessAdmin({ brand }: { brand: Brand }) {
   const [initialSearch, setInitialSearch] = useState("");
   const orderSection = ["Orders", "Quotes", "Fulfilment"].includes(tab);
   const overview = tab === "Overview" || tab === "Reports";
-  const redesignedWorkspace = ["Inventory", "Customers", "Settings", "Accounts", "Enquiries"].includes(tab);
+  const redesignedWorkspace = ["Inventory", "Customers", "Settings", "Accounts", "Enquiries", "Delivery"].includes(tab);
   const atelierOrders = !gift && orderSection && !!data;
   const go = (section: string, term = "", next = "") => {
     if (section !== tab) window.scrollTo({ top: 0, behavior: "instant" });
@@ -236,7 +238,7 @@ export default function BusinessAdmin({ brand }: { brand: Brand }) {
               go(t);
             }}
           >
-            {({ Overview: gift ? "Gift desk" : "Dashboard", "Page builder": "Brand Studio", "Live chat": "Conversations", Activity: "Audit trail" } as Record<string, string>)[t] ?? t}
+            {({ Overview: gift ? "Gift desk" : "Dashboard", "Page builder": "Brand Studio", "Live chat": "Conversations", Activity: "Audit trail", Delivery: "Delivery fees" } as Record<string, string>)[t] ?? t}
             {t === "Live chat" &&
               data?.conversations.some((c) => c.unread > 0) && (
                 <b className="unread-dot">
@@ -364,6 +366,7 @@ export default function BusinessAdmin({ brand }: { brand: Brand }) {
                     mode={tab} intent={intent} initialSearch={initialSearch} go={go}
                     signOut={() => void logout()} />
               )}{" "}
+              {tab === "Delivery" && <DeliveryFeesWorkspace data={data} act={act} busy={busy} />}
               {tab === "Inventory" && <InventoryWorkspace data={data} brand={brand} act={act} busy={busy} error={error} />}{" "}
               {tab === "Customers" && (
                 <CustomersWorkspace data={data} brand={brand} act={act} busy={busy} error={error} search={search} setSearch={setSearch} openOrder={id => go("Orders", id)} />
@@ -505,6 +508,10 @@ function Products({
               <label>Maximum quantity<input name="maximum" type="number" min="1" step="1" defaultValue={selected?.maximum} /></label>
               <label>Customisation<select name="customisation" defaultValue={selected?.customisation ?? (brand === "kokies" ? "personalised" : "none")}><option value="none">Non-personalised</option><option value="personalised">Personalised</option><option value="branded">Branded</option></select></label>
               <label>Lead time<input name="leadTime" defaultValue={selected?.leadTime} placeholder="e.g. 5–7 working days" /></label>
+              <label>Extra delivery fee (₦)
+                <input name="deliveryFee" type="number" min="0" step="50" defaultValue={selected?.deliveryFee ?? ""} placeholder="0 · added to the location fee" />
+                <small className="desk-field-hint">Added once per order when this product is delivered, on top of the state or Abuja-area fee. Leave empty for none.</small>
+              </label>
               <label>Availability<select name="availability" defaultValue={selected?.availability ?? "stock"}><option value="stock">Stock tracked</option><option value="made">Made to order</option><option value="preorder">Pre-order</option></select></label>
               <label>SEO title<input name="seoTitle" defaultValue={selected?.seoTitle} /></label>
               <label>SEO description<input name="seoDescription" defaultValue={selected?.seoDescription} /></label>
@@ -575,10 +582,6 @@ function Products({
                   </option>
                 ))}
               </datalist>
-              {brand === "kokies" && <label className="desk-check">
-                <input type="checkbox" name="priceConfirmed" defaultChecked={selected?.priceConfirmed} />
-                Confirm this unit price for checkout
-              </label>}
               <label className="desk-check">
                 <input
                   name="sample"
@@ -833,6 +836,7 @@ function OrderDetail({ order: o, act, brand, refresh }: { order: LocalOrder; act
         {o.email}
         <br />
         {o.deliveryMethod === "pickup" ? "Customer pickup" : o.address}
+        {o.deliveryMethod !== "pickup" && o.deliveryState && <><br />Delivery to {o.deliveryArea ? `${o.deliveryArea}, Abuja` : o.deliveryState} · {o.deliveryPending ? "fee to confirm (issue a quote)" : naira(o.deliveryFee ?? 0)}</>}
       </p>
       <Badge>{o.paymentStatus}</Badge>
       <DataList data={o.items} label="Order items" limit={5} render={rows => <div>{rows.map((i, n) => (
@@ -937,7 +941,7 @@ function OrderDetail({ order: o, act, brand, refresh }: { order: LocalOrder; act
           ))}
           <label>
             Delivery fee (₦)
-            <input name="delivery" type="number" min="0" defaultValue="0" />
+            <input name="delivery" type="number" min="0" defaultValue={o.deliveryFee ?? 0} />
           </label>
           <label>
             Quote details
