@@ -1,3 +1,5 @@
+"use client";
+import { useEffect, useState } from "react";
 import type { Brand } from "./types";
 export type BagLine = {
   productId: string;
@@ -30,4 +32,21 @@ export function addToBag(brand: Brand, line: BagLine) {
   if (existing) existing.quantity += line.quantity;
   else lines.push(line);
   saveBag(brand, lines);
+}
+
+/** Number of lines in a brand's bag, kept in sync across components and tabs. */
+export function useBagCount(brand: Brand) {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    const load = () => setCount(readBag(brand).length);
+    load();
+    const onStorage = (e: StorageEvent) => { if (e.key === `bag-${brand}`) load(); };
+    window.addEventListener("bag-change", load);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("bag-change", load);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [brand]);
+  return count;
 }

@@ -1,6 +1,6 @@
 "use client";
 import { campaignDefaults } from "../components/admin/idesire/campaigns";
-import {useLocal,asFabric} from '../lib/local/client';
+import {useLocal,useFabricCatalogue} from '../lib/local/client';
 import {CmsHeading,CmsIntro} from '../components/CmsPage';
 
 import Link from 'next/link';
@@ -13,11 +13,11 @@ const defaultTitle = 'Make an entrance.';
 const defaultText = 'Statement fabrics for unforgettable celebrations.';
 const oldTitle = 'For the moments that bring us together.';
 export default function Home() {
-  const [catalogue, setCatalogue] = useState<Product[]>(seed);
-  const [heroTitle, setHeroTitle] = useState(defaultTitle);
-  const [heroText, setHeroText] = useState(defaultText);
   const [active, setActive] = useState(0);
-  const {data:serverData}=useLocal(); useEffect(()=>{if(serverData){setCatalogue(serverData.products.map(asFabric));setHeroTitle(serverData.settings.heroTitle);setHeroText(serverData.settings.heroText);}},[serverData]);
+  const {data:serverData}=useLocal();
+  const catalogue = useFabricCatalogue();
+  const heroTitle = serverData?.settings.heroTitle || defaultTitle;
+  const heroText = serverData?.settings.heroText || defaultText;
   const defaults = campaignDefaults(heroTitle, heroText);
   const configured = defaults.map((slide, slot) => {
     const custom = serverData?.settings.heroSlides?.[slot];

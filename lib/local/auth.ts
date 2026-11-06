@@ -2,7 +2,7 @@ import {
   randomBytes,
   createHmac,
   timingSafeEqual,
-  scryptSync,
+  scrypt,
 } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -95,6 +95,13 @@ export class AuthError extends Error {
     super(message);
   }
 }
+const DUMMY_SALT = "0f1e2d3c4b5a69788796a5b4c3d2e1f0";
+/** Non-blocking scrypt so one sign-in does not stall every other request. */
+export function hashPassword(password: string, salt: string) {
+  return new Promise<Buffer>((resolve, reject) =>
+    scrypt(password, salt, 64, (error, key) => (error ? reject(error) : resolve(key))),
+  );
+}
 export async function login(email: string, password: string) {
   if (!email.trim() || !password) return null;
   const db = await database();
@@ -103,8 +110,9 @@ export async function login(email: string, password: string) {
       u.email.toLowerCase() === email.trim().toLowerCase() ||
       u.username?.toLowerCase() === email.trim().toLowerCase(),
   );
+  // Always run the hash so response time does not reveal which usernames exist.
+  const candidate = await hashPassword(password, user?.salt ?? DUMMY_SALT);
   if (!user || user.status === "Suspended") return null;
-  const candidate = scryptSync(password, user.salt, 64);
   if (!timingSafeEqual(candidate, Buffer.from(user.passwordHash, "hex")))
     return null;
   const { salt: _salt, passwordHash: _hash, ...publicUser } = user;

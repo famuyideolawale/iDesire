@@ -1,3 +1,5 @@
+import type { Metadata } from 'next';
+export const metadata: Metadata = { title: 'Contact us', description: 'Reach the iDesire TRADS fabric team on WhatsApp, email or by visiting us.' };
 import BrandDetails from "../../components/BrandDetails";
 import LocalEnquiry, { BrandContact } from "../../components/LocalEnquiry";
 import { CmsHeading, CmsIntro } from "../../components/CmsPage";

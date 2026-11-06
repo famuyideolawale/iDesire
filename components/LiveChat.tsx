@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { api, useLocal } from "../lib/local/client";
+import { MessageCircle } from "lucide-react";
+import { api, useLocal, whatsappNumber } from "../lib/local/client";
 import { brandNames, type Brand, type Conversation } from "../lib/local/types";
 export default function LiveChat({ brand = "idesire" }: { brand?: Brand }) {
   const { data } = useLocal();
@@ -14,6 +15,10 @@ export default function LiveChat({ brand = "idesire" }: { brand?: Brand }) {
     [unread, setUnread] = useState(false);
   const end = useRef<HTMLDivElement>(null);
   const lastStaff = useRef("");
+  const openRef = useRef(false),
+    activeRef = useRef(false);
+  openRef.current = open;
+  activeRef.current = !!conversation;
   const sending = useRef(false),
     mutationVersion = useRef(0),
     initialized = useRef(false);
@@ -42,7 +47,10 @@ export default function LiveChat({ brand = "idesire" }: { brand?: Brand }) {
       }
     };
     void load();
-    const timer = setInterval(() => { if (!document.hidden) void load(); }, 3000);
+    // Poll only for visitors who have a conversation or the panel open.
+    const timer = setInterval(() => {
+      if (!document.hidden && (openRef.current || activeRef.current)) void load();
+    }, 4000);
     window.addEventListener("focus", load);
     return () => {
       alive = false;
@@ -89,7 +97,10 @@ export default function LiveChat({ brand = "idesire" }: { brand?: Brand }) {
             <span className="chat-label-full">
               Chat with {brand === "kokies" ? "Kokies" : "us"} ✦
             </span>
-            <span className="chat-label-short">Chat ✦</span>
+            <span className="chat-label-short" aria-hidden="true">
+              <MessageCircle size={20} strokeWidth={1.8} />
+            </span>
+            <span className="sr-only chat-label-sr">Chat with us</span>
             {unread && <b> • New reply</b>}
           </>
         )}
@@ -170,7 +181,7 @@ export default function LiveChat({ brand = "idesire" }: { brand?: Brand }) {
             )}
             <textarea
               required
-              maxLength={5000}
+              maxLength={2000}
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="How can we help?"
@@ -183,7 +194,7 @@ export default function LiveChat({ brand = "idesire" }: { brand?: Brand }) {
             {error && <p role="alert">{error}</p>}
             <a
               className="chat-whatsapp-link"
-              href={`https://wa.me/${data?.settings.phone || (brand === "kokies" ? "2349099591993" : "2348091142201")}`}
+              href={`https://wa.me/${whatsappNumber(data?.settings.phone, brand === "kokies" ? "2349099591993" : "2348091142201")}`}
               target="_blank"
               rel="noreferrer"
             >

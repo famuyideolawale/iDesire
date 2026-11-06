@@ -114,8 +114,8 @@ export function seedBusiness(brand: Brand): BusinessData {
       id: isGift ? "gift-" + slug : slug, slug, name, category, collection: category,
       sku: (isGift ? "KOK" : "IDT") + "-SAMPLE-" + (index + 1), price,
       image: (isGift ? "/kokies/" : "/products/") + image,
-      description: isGift ? "Illustrative gifting option. Ask the team to confirm finish, packaging and lead time." :
-        "Illustrative fabric selection. Ask the team to confirm the colour, finish and available length.",
+      description: isGift ? "Made to order for your occasion. Tell us your quantity and wording, and we will confirm finish, packaging, lead time and price in your quote." :
+        "A made-to-order fabric selection. Tell us your colours and quantity, and we will confirm the finish, available length and price.",
       minimum, unit: isGift ? "unit" : "yard", status: "published", sample: true,
       availability: index % 3 === 0 ? "preorder" : "made",
       customisation: isGift ? (index === 6 ? "none" : index % 2 ? "branded" : "personalised") : "none",
@@ -226,11 +226,11 @@ export function seedBusiness(brand: Brand): BusinessData {
       notes: isGift
         ? "Sample personalisation: event name and gift presentation to confirm."
         : "Sample wedding/group fabric order. Colours confirmed with the customer.",
-      createdAt: ago(12 - i),
+      createdAt: ago(Math.max(0, 12 - i) + 0.05 * (15 - i)),
       updatedAt: ago(Math.max(0, 5 - i)),
       history: [
         {
-          at: ago(12 - i),
+          at: ago(Math.max(0, 12 - i) + 0.05 * (15 - i)),
           actor: "Demo setup",
           text: "Demonstration order created",
         },

@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { api, useLocal } from "../lib/local/client";
+import { api, useLocal, whatsappNumber } from "../lib/local/client";
 import type { Brand } from "../lib/local/types";
 export default function LocalEnquiry({
   brand = "idesire",
@@ -86,7 +86,7 @@ export function BrandContact() {
   return (
     <div className="contact-grid">
       <a
-        href={`https://wa.me/${data?.settings.phone || "2348091142201"}`}
+        href={`https://wa.me/${whatsappNumber(data?.settings.phone, "2348091142201")}`}
         target="_blank"
         rel="noreferrer"
       >

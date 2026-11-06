@@ -6,6 +6,7 @@ import {
   sessionUser,
 } from "../../../../lib/local/auth";
 import { body, failure } from "../../../../lib/local/http";
+import { mutate } from "../../../../lib/local/store";
 import { limitRequest } from "../../../../lib/local/rate-limit";
 export const dynamic = "force-dynamic";
 export async function GET() {
@@ -44,6 +45,13 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     checkOrigin(request);
+    // Revoke the signed token server-side, so a copied cookie stops working too.
+    const user = await sessionUser();
+    if (user)
+      await mutate(user.brands[0], user.name, "Signed out", user.id, (_b, db) => {
+        const account = db.users.find((u) => u.id === user.id);
+        if (account) account.sessionVersion = (account.sessionVersion ?? 0) + 1;
+      });
     const response = NextResponse.json({ ok: true });
     response.cookies.set("dual-admin-session", "", {
       httpOnly: true,

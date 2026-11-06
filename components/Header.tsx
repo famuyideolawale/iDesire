@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Menu, X, Search, ShoppingBag } from "lucide-react";
+import { useBagCount } from "../lib/local/bag";
 
 const navigation = [
   { name: "Shop fabrics", href: "/shop", className: "shop-all-link" },
@@ -15,6 +16,7 @@ export default function Header() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
+  const bagCount = useBagCount("idesire");
   useEffect(() => setOpen(false), [pathname]);
   useEffect(() => {
     if (open)
@@ -59,6 +61,9 @@ export default function Header() {
           <Link className="mobile-utility-link" href="/contact">
             Contact
           </Link>
+          <Link className="mobile-utility-link mobile-sister-link" href="/kokies-world-of-gift">
+            Kokies · Gifts & souvenirs ↗
+          </Link>
         </nav>
         <div className="header-actions">
           <Link className="header-track" href="/track-order">
@@ -74,9 +79,10 @@ export default function Header() {
           <Link
             className="header-icon bag-link"
             href="/cart"
-            aria-label="Shopping bag"
+            aria-label={bagCount ? `Shopping bag, ${bagCount} ${bagCount === 1 ? "item" : "items"}` : "Shopping bag"}
           >
             <ShoppingBag size={21} />
+            {bagCount > 0 && <span className="bag-count" aria-hidden="true">{bagCount}</span>}
           </Link>
           <button
             ref={menuButton}

@@ -9,11 +9,14 @@ import BrandDirectory from "./BrandDirectory";
 import { LocalProvider } from "../lib/local/client";
 import CmsPage from "./CmsPage";
 import KokiesHeader from "./KokiesHeader";
+import type { Brand, PublicData } from "../lib/local/types";
 
 export default function StoreShell({
   children,
+  initial = null,
 }: {
   children: React.ReactNode;
+  initial?: { brand: Brand; data: PublicData } | null;
 }) {
   const path = usePathname();
   if (path === "/admin" || path.startsWith("/admin/"))
@@ -23,7 +26,7 @@ export default function StoreShell({
     path.startsWith("/kokies-world-of-gift/")
   )
     return (
-      <LocalProvider key="kokies" brand="kokies">
+      <LocalProvider key="kokies" brand="kokies" initialData={initial?.brand === "kokies" ? initial.data : null}>
         <div className="kokies-site">
           <a className="skip-link" href="#main-content">
             Skip to content
@@ -86,7 +89,7 @@ export default function StoreShell({
       </LocalProvider>
     );
   return (
-    <LocalProvider key="idesire" brand="idesire">
+    <LocalProvider key="idesire" brand="idesire" initialData={initial?.brand === "idesire" ? initial.data : null}>
       <div className="idesire-site">
         <a className="skip-link" href="#main-content">
           Skip to content

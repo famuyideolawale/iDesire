@@ -10,10 +10,11 @@ import {
 } from "../../../../lib/local/store";
 import { checkOrigin, requireUser } from "../../../../lib/local/auth";
 import { body, failure } from "../../../../lib/local/http";
-import { availableStock, checkoutHash, createOrder, createEnquiry, holdExpired, needsFinalQuote, normalPhone } from "../../../../lib/local/actions";
+import { checkoutHash, createOrder, createEnquiry, holdExpired, needsFinalQuote, normalPhone } from "../../../../lib/local/actions";
 import { customerToken, signedInCustomer } from "../../../../lib/local/customer-auth";
 import { limitRequest } from "../../../../lib/local/rate-limit";
-import { effectivePrice, type LocalOrder } from "../../../../lib/local/types";
+import { type LocalOrder } from "../../../../lib/local/types";
+import { buildPublicData } from "../../../../lib/local/public";
 
 function orderStatus(o: LocalOrder) {
   return {
@@ -50,25 +51,7 @@ export async function GET(
     const preview = query.get("preview") === "1";
     if (preview) await requireUser(brand);
     return NextResponse.json(
-      {
-        revision: b.revision,
-        previewAuthorized: preview,
-        sharedElements: preview
-          ? (b.sharedDesign?.draft ?? [])
-          : (b.sharedDesign?.published ?? []),
-        products: b.products.filter(p => p.status === "published").map(p => ({...p, price: effectivePrice(p)})),
-        inventory: b.inventory.map((i) => ({
-          productId: i.productId,
-          available: availableStock(b, i.productId),
-        })),
-        settings: b.settings,
-        pages: b.pages.map((p) => ({
-          id: p.id,
-          path: p.path,
-          published:
-            preview && query.get("page") === p.id ? p.draft : p.published,
-        })),
-      },
+      buildPublicData(b, { preview, pageId: query.get("page") }),
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (e) {
@@ -130,6 +113,9 @@ export async function POST(
     }
     if (input.type === "order" || input.type === "enquiry")
       limitRequest(request, "order", 30, 5 * 60_000);
+    else if (input.type === "subscribe")
+      limitRequest(request, "subscribe", 5, 10 * 60_000);
+    else throw new Error("Unsupported request.");
     const token = input.type === "order" ? await customerToken(brand) : "";
     const result = await mutate(
       brand,

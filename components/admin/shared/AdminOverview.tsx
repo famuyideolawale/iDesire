@@ -90,7 +90,7 @@ export default function AdminOverview({ data, brand, session, go, signOut, repor
 
   return <div className={"admin-dashboard " + (gift ? "gift-dashboard" : "fashion-dashboard")}>
     <header className="dash-hero"><div className={gift ? "gift-workroom-intro" : undefined}>{gift && <img src="/kokies/kokies-logo.webp" alt="" />}<div><span className="desk-kicker">{gift ? "Kokies World of Gifts · The gifting desk" : "The business of beautiful occasions"}</span>
-      <h1>{reports ? "Business reports" : gift ? "Your gifting business, at a glance." : "Your business, at a glance."}</h1><p>{session.name} · {session.role}</p></div></div>
+      <h1>{reports ? "Business reports" : gift ? "Your gifting business, at a glance." : "Your business, at a glance."}</h1><p>{session.name === session.role ? session.role : `${session.name} · ${session.role}`}</p></div></div>
       <div className="dash-header-tools"><div className="dash-search"><Search size={16} /><input aria-label="Search workspace" placeholder="Search orders, customers, products…" value={term} onChange={e => setTerm(e.target.value)} />
         {!!term.trim() && <div className="dash-popover">{searchResults.length ? searchResults.map((r,i) => <button key={i} onClick={() => go(r.tab,r.search)}>{r.label}<small>{r.detail}</small></button>) : <p>No matches.</p>}</div>}
       </div><details className="dash-menu"><summary aria-label="Notifications"><Bell size={18} /><b>{unread + count("Awaiting payment")}</b></summary><div className="dash-popover"><button onClick={() => go("Live chat")}>{unread} unread messages</button><button onClick={() => go("Orders","","Awaiting payment")}>{count("Awaiting payment")} pending payments</button></div></details>

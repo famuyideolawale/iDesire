@@ -1,0 +1,141 @@
+/*
+ * Premium polish layer. Loaded last, so it refines the earlier stylesheets
+ * without rewriting them. Grouped by area; each block says what it fixes.
+ */
+
+/* ---------- Typography ---------- */
+h1, h2, h3 { text-wrap: balance; }
+p { text-wrap: pretty; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+::selection { background: #80002022; }
+:focus-visible { outline: 2px solid #b8873f; outline-offset: 3px; }
+
+/* iDesire: one display voice. Section headings used the heavy sans; use the serif. */
+.idesire-site .fashion-section-heading h2 {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.08;
+}
+
+/* ---------- Sister-brand switcher: slimmer on desktop, in the menu on phones ---------- */
+.brand-directory > a { min-height: 34px; padding-top: 8px; padding-bottom: 8px; }
+.brand-directory a b, .brand-directory a small { font-size: 11px; letter-spacing: 0.01em; }
+@media (max-width: 700px) {
+  .brand-directory { display: none !important; }
+}
+.idesire-site .site-header nav .mobile-sister-link,
+.kokies-header nav .mobile-sister-link { display: none; }
+@media (max-width: 700px) {
+  .idesire-site .site-header nav.mobile-open .mobile-sister-link { display: block; opacity: 0.8; }
+}
+@media (max-width: 700px) {
+  .kokies-header nav.kokies-navigation-open .mobile-sister-link { display: block; opacity: 0.8; }
+}
+
+/* ---------- Bag count badges ---------- */
+.idesire-site .site-header .bag-link,
+.kokies-bag-link { position: relative; }
+.bag-count {
+  position: absolute; top: -5px; right: -7px;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 999px; background: #800020; color: #fff5eb;
+  font: 600 10px/18px 'DM Sans', sans-serif; text-align: center;
+  box-shadow: 0 0 0 2px #fffbf6;
+}
+.kokies-bag-link {
+  display: inline-grid; place-items: center;
+  width: 42px; height: 42px; border-radius: 50%;
+  color: #4b1922; border: 1px solid #e3cfc8; background: #fffaf4;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.kokies-bag-link:hover { background: #f5e9e3; border-color: #cfa9a1; }
+.kokies-bag-link .bag-count { background: #74333a; top: -4px; right: -4px; box-shadow: 0 0 0 2px #fdf6ec; }
+.kokies-header .kokies-nav-actions { display: flex; align-items: center; gap: 10px; }
+
+/* ---------- Live chat launcher ---------- */
+.chat-launch { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.chat-launch:hover { transform: translateY(-2px); box-shadow: 0 12px 32px #0003; }
+.chat-label-sr { display: none; }
+@media (max-width: 700px) {
+  /* A round icon button that no longer covers slider arrows or filter buttons. */
+  .live-chat-widget .chat-launch:not([aria-expanded="true"]) {
+    width: 52px; height: 52px; padding: 0 !important;
+    border-radius: 50%; display: grid; place-items: center;
+  }
+  .live-chat-widget .chat-launch:not([aria-expanded="true"]) b { position: absolute; top: -2px; right: -2px; font-size: 0; width: 12px; height: 12px; border-radius: 50%; background: #d6b16d; box-shadow: 0 0 0 2px #fffbf6; }
+  .chat-label-short { display: grid !important; place-items: center; }
+  .chat-label-sr { display: inline; position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+}
+
+/* ---------- iDesire product cards: name, price, then swatches, always in that order ---------- */
+.idesire-site .product-meta { display: block; }
+.idesire-site .product-meta .card-price {
+  display: block; margin-top: 6px;
+  font: 600 13px/1.4 'DM Sans', sans-serif; color: #800020; letter-spacing: 0.01em;
+}
+.card-swatches { display: flex; gap: 6px; align-items: center; margin-top: 10px; }
+.card-swatches span {
+  width: 12px; height: 12px; border-radius: 50%;
+  border: 1px solid #0000001f; box-shadow: inset 0 0 0 1px #ffffff40; display: inline-block;
+}
+.card-swatches small { margin-left: 3px; color: #756b68; font-size: 11px; }
+.product-card .product-image-wrap img { transition: transform 0.6s cubic-bezier(.2,.7,.2,1); }
+.product-card:hover .product-image-wrap img { transform: scale(1.035); }
+@media (prefers-reduced-motion: reduce) {
+  .product-card:hover .product-image-wrap img, .chat-launch:hover { transform: none; }
+}
+
+/* ---------- iDesire product page ---------- */
+.colour-thumbs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.colour-thumbs button {
+  padding: 3px; background: #fff; cursor: pointer;
+  border: 1px solid #e4dbd6; transition: border-color 0.2s ease;
+}
+.colour-thumbs button[aria-pressed="true"] { border: 2px solid #79183d; padding: 2px; }
+.colour-thumbs img { width: 100%; height: 90px; object-fit: cover; display: block; }
+.colour-thumbs span { display: block; font-size: 12px; padding: 5px 2px; color: #3b2a2c; }
+.stock-note { font-size: 13px; color: #4f6b4f; margin: 4px 0 10px; display: flex; align-items: center; gap: 8px; }
+.stock-note::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.stock-note.stock-low { color: #9a5b14; }
+@media (max-width: 700px) {
+  /* The colour circles in the details already switch colour; skipping the
+     large thumbnails brings the name and price straight under the photo. */
+  .idesire-site .colour-thumbs { display: none; }
+  .idesire-site .product-detail { row-gap: 18px; }
+}
+
+/* ---------- Footers: the full-colour logo sits on a cream card, as on Kokies ---------- */
+.idesire-site .footer .footer-logo { display: inline-block; background: #fff5eb; border-radius: 10px; padding: 8px 14px; box-shadow: 0 6px 18px #0000002e; }
+.idesire-site .footer .footer-logo img { width: 112px; height: 64px; }
+
+/* ---------- Kokies header: one row on phones ---------- */
+@media (max-width: 560px) {
+  .kokies-header .kokies-header-cta { display: none; }
+  .kokies-header .kokies-nav-actions { margin-left: auto; }
+}
+
+/* ---------- Kokies shop ---------- */
+.kokies-more-filters { flex: 1 1 auto; }
+.kokies-catalogue-tools .kokies-reset { margin-left: auto; }
+.kokies-more-filters > summary {
+  cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 8px;
+  font: 600 12px/1 'DM Sans', sans-serif; color: #4b1922;
+  padding: 10px 14px; border-radius: 999px; border: 1px solid #dfc7c1; background: #fffaf4;
+}
+.kokies-more-filters > summary::-webkit-details-marker { display: none; }
+.kokies-more-filters > summary::after { content: "+"; font-weight: 400; font-size: 15px; }
+.kokies-more-filters[open] > summary::after { content: "–"; }
+.kokies-more-filters > div { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 14px; }
+.kokies-more-filters > div label { flex: 1 1 180px; display: grid; gap: 6px; }
+.kokies-product-copy p {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+@media (max-width: 420px) { .kokies-product-copy p { display: none; } }
+.kokies-product-copy strong small:first-child { font-weight: 400; margin-right: 3px; }
+.kokies-product-card { transition: transform 0.25s ease, box-shadow 0.25s ease; }
+.kokies-product-card:hover { transform: translateY(-3px); box-shadow: 0 18px 40px #4b192214; }
+@media (prefers-reduced-motion: reduce) { .kokies-product-card:hover { transform: none; } }

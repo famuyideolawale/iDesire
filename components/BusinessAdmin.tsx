@@ -50,6 +50,15 @@ const tabs = [
   "Accounts",
   "Activity",
 ];
+// Sidebar groups, in display order. The tab names themselves are unchanged.
+const navGroups: [string, string[]][] = [
+  ["", ["Overview"]],
+  ["Sales", ["Orders", "Quotes", "Fulfilment", "Reports"]],
+  ["Catalogue", ["Products", "Collections", "Promotions", "Inventory", "Media"]],
+  ["Customers", ["Customers", "Enquiries", "Live chat"]],
+  ["Website", ["Page builder", "Settings"]],
+  ["Team", ["Accounts", "Activity"]],
+];
 const fmt = (s: string) =>
   new Date(s).toLocaleString("en-NG", {
     dateStyle: "medium",
@@ -62,6 +71,7 @@ function Badge({ children }: { children: React.ReactNode }) {
   return <AdminBadge>{children}</AdminBadge>;
 }
 export default function BusinessAdmin({ brand }: { brand: Brand }) {
+  const [showPassword, setShowPassword] = useState(false);
   const [data, setData] = useState<DeskData | null>(null),
     [session, setSession] = useState<SessionUser | null>(null),
     [loading, setLoading] = useState(true),
@@ -181,12 +191,21 @@ export default function BusinessAdmin({ brand }: { brand: Brand }) {
             </label>
             <label>
               Password
-              <input
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-              />
+              <span className="desk-password">
+                <input
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  required
+                />
+                <button
+                  type="button"
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </span>
             </label>
             <button className="desk-primary" disabled={busy}>
               Sign in
@@ -197,15 +216,20 @@ export default function BusinessAdmin({ brand }: { brand: Brand }) {
               {error}
             </p>
           )}
+          <p className="desk-login-help">Forgot your password? Ask your Developer or Owner to reset it in Accounts.</p>
           <Link href={homePath(brand)}>← Back to the website</Link>
         </div>
       </div>
     );
   const nav = (
     <nav id="admin-navigation" className={navigationOpen ? "admin-nav-open" : ""} aria-label={`${brandNames[brand]} admin sections`}>
-      {tabs
-        .filter((t) => t !== "Accounts" || canManageAccounts(session))
-        .map((t) => (
+      {navGroups.map(([group, members]) => {
+        const visible = members.filter((t) => tabs.includes(t) && (t !== "Accounts" || canManageAccounts(session)));
+        if (!visible.length) return null;
+        return (
+          <div className="admin-nav-group" key={group || "home"} role="group" aria-label={group || undefined}>
+            {group && <span className="admin-nav-label" aria-hidden="true">{group}</span>}
+            {visible.map((t) => (
           <button
             key={t}
             aria-current={tab === t ? "page" : undefined}
@@ -221,7 +245,10 @@ export default function BusinessAdmin({ brand }: { brand: Brand }) {
                 </b>
               )}
           </button>
-        ))}
+            ))}
+          </div>
+        );
+      })}
     </nav>
   );
   return (
@@ -286,7 +313,7 @@ export default function BusinessAdmin({ brand }: { brand: Brand }) {
                   : tab}
               </h1>
               <p>
-                {brandNames[brand]} · {session.name} · {session.role}
+                {brandNames[brand]} · {session.name === session.role ? session.role : `${session.name} · ${session.role}`}
               </p>
             </div>
             <Badge>LOCAL WORKSPACE · LIVE DATA</Badge>

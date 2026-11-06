@@ -84,3 +84,14 @@ Render’s free service can sleep when idle, so an initial request may take longer
 ## Visual assets
 
 Kokies uses wine `#74333A` and cream `#FDF6EC` sampled from the supplied logo. iDesire retains burgundy, cream and champagne with a fashion-led layout. Both storefronts introduce and link to the separate sister business. Optimised campaign images live in `public/campaigns/`; fabrics in `public/products/`; finished gifts in `public/kokies/`. Generation notes are retained with the assets. No fabric products are placed in Kokies.
+
+## November 2026 upgrade notes
+
+- Security: chat, newsletter and storefront writes are rate-limited; chats are capped per visitor and per day. Sign-out now revokes the session on the server (it ends that account's sessions on every device). Sign-in hashes even unknown usernames so timing reveals nothing. The staff events stream is staff-only.
+- Orders and stock: issuing a quote now reserves stock and holds it for 72 hours, so a customer who pays is never blocked. Quotes need a unit price above zero. Made-to-order, pre-order and concept products do not hold stock. Stock ledgers keep the latest 250 movements per product.
+- Server-rendered storefront: `proxy.ts` tells the root layout which brand is open; the layout loads that brand's public data on the server, so prices and copy are correct on first paint and in search results. The browser then polls the revision every 15 seconds.
+- SEO: page titles for every page, `sitemap.xml`, `robots.txt`, Open Graph images and Product structured data.
+- Fonts: storefront fonts are self-hosted in `public/fonts/store` (no Google Fonts request).
+- Styles: `app/premium.css` (storefront) and `app/admin-premium.css` (admin) load last and hold the visual refinements. `admin-workspaces.css` and `admin-system.css` now load only in the admin; `admin-desk.css` stays global because it also styles the bag, chat and tracking.
+- Kokies listing: sample concepts that reuse a real product's photo are hidden from the shop and home page until they have their own photo; their pages still work.
+- Checks: `npm run lint` and `npm run typecheck` run `tsc --noEmit` (Next 16 removed `next lint`).

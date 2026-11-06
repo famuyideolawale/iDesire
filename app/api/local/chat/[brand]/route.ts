@@ -11,6 +11,11 @@ import {
 } from "../../../../../lib/local/store";
 import { checkOrigin } from "../../../../../lib/local/auth";
 import { body, failure } from "../../../../../lib/local/http";
+import { limitRequest } from "../../../../../lib/local/rate-limit";
+
+const MAX_MESSAGES = 300;
+const MAX_CONVERSATIONS = 2000;
+const MAX_NEW_PER_DAY = 200;
 export const dynamic = "force-dynamic";
 const hash = (token: string) =>
   createHash("sha256").update(token).digest("hex");
@@ -54,10 +59,11 @@ export async function POST(
 ) {
   try {
     checkOrigin(request);
+    limitRequest(request, "chat", 20, 5 * 60_000);
     const brand = parseBrand((await params).brand),
       token = await identity(brand),
       input = record(await body(request));
-    const message = required(input.text, "Message", 5000);
+    const message = required(input.text, "Message", 2000);
     const c = await mutate(
       brand,
       "Website visitor",
@@ -66,6 +72,9 @@ export async function POST(
       (b) => {
         let c = b.conversations.find((c) => c.visitorHash === hash(token));
         if (!c) {
+          const dayAgo = Date.now() - 86_400_000;
+          if (b.conversations.filter((x) => Date.parse(x.createdAt) > dayAgo).length >= MAX_NEW_PER_DAY)
+            throw new Error("Chat is busy right now. Please message us on WhatsApp.");
           c = {
             id: "CHAT-" + randomUUID(),
             visitorHash: hash(token),
@@ -80,7 +89,15 @@ export async function POST(
             unread: 0,
           };
           b.conversations.unshift(c);
+          if (b.conversations.length > MAX_CONVERSATIONS) {
+            // Drop the oldest resolved conversations first.
+            const resolved = b.conversations.filter((x) => x.status === "Resolved");
+            const drop = new Set(resolved.slice(-(b.conversations.length - MAX_CONVERSATIONS)).map((x) => x.id));
+            b.conversations = b.conversations.filter((x) => !drop.has(x.id));
+          }
         }
+        if (c.messages.length >= MAX_MESSAGES)
+          throw new Error("This conversation is full. Please start again on WhatsApp.");
         if (text(input.name)) c.name = text(input.name, 180);
         c.messages.push({
           id: randomUUID(),

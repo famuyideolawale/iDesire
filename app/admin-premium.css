@@ -1,0 +1,53 @@
+/* Admin polish layer, loaded after the other admin stylesheets. */
+
+/* Grouped sidebar: groups are invisible wrappers except in the iDesire desktop sidebar. */
+.admin-nav-group { display: contents; }
+.admin-nav-label { display: none; }
+@media (min-width: 761px) {
+  .idesire-desk .desk-layout > nav .admin-nav-group { display: flex; flex-direction: column; gap: 3px; }
+  .idesire-desk .desk-layout > nav .admin-nav-group + .admin-nav-group { margin-top: 14px; }
+  .idesire-desk .desk-layout > nav .admin-nav-label {
+    display: block; padding: 0 17px 4px;
+    font: 600 10px/1.4 var(--admin-body, 'Admin Inter', sans-serif);
+    letter-spacing: 0.14em; text-transform: uppercase; color: #d9b3c180;
+  }
+  .idesire-desk .desk-layout > nav button { padding-top: 10px; padding-bottom: 10px; }
+}
+/* Kokies: one scrollable row of pills instead of wrapping onto a second row. */
+@media (min-width: 761px) {
+  .kokies-desk .desk-layout > nav { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
+  .kokies-desk .desk-layout > nav button { white-space: nowrap; }
+}
+
+/* Compact page headers: the large greeting stays on the dashboard, at a calmer size. */
+.business-desk .ops-hero { padding-top: 18px; padding-bottom: 18px; }
+.business-desk .ops-hero h1 { font-size: clamp(30px, 3vw, 42px); margin: 2px 0 4px; }
+.business-desk .ops-hero p { margin: 0; }
+.business-desk .dash-hero { padding: clamp(14px, 2vw, 24px) clamp(16px, 2.4vw, 30px); }
+.business-desk .dash-hero h1 { font-size: clamp(28px, 3vw, 42px); }
+
+/* Order notes save on their own. */
+.ops-notes-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
+.ops-notes-actions button {
+  border: 1px solid var(--admin-border, #e2d4cc); background: #fff; border-radius: 8px;
+  padding: 8px 14px; font-weight: 600; cursor: pointer;
+}
+/* Phones: show every order step, stacked, and keep the actions in reach. */
+@media (max-width: 760px) {
+  /* A vertical stepper: dot on the left, connector down to the next step. */
+  .ops-timeline ol { flex-direction: column; overflow: visible; }
+  .ops-timeline li { flex: none; text-align: left; padding: 0 0 12px 24px; font-size: 12px; }
+  .ops-timeline li::before { inset: 2px auto auto 0; transform: none; }
+  .ops-timeline li:not(:last-child)::after { inset: 14px auto 0 5px; width: 0; border-top: 0; border-left: 1px solid #d3bfc1; }
+  .ops-timeline li small { display: inline; margin: 0 0 0 6px; }
+  .ops-actionbar { position: sticky; bottom: 0; z-index: 5; background: #fffaf6; padding: 10px 0; box-shadow: 0 -8px 18px #3b0a1a14; }
+}
+
+/* Sign-in */
+.desk-password { display: flex; gap: 6px; align-items: stretch; }
+.desk-password input { flex: 1; min-width: 0; }
+.desk-password button {
+  border: 1px solid #ded2c8; background: #fffdfa; border-radius: 8px; padding: 0 14px;
+  font-size: 13px; cursor: pointer; color: #5a2a36;
+}
+.desk-login-help { font-size: 13px; color: #7a6a66; margin-top: 18px; }

@@ -1,6 +1,6 @@
 import { accountAction } from "./accounts";
 import { AuthError } from "./auth";
-import { randomUUID, randomBytes, scryptSync, createHash } from "node:crypto";
+import { randomUUID, randomBytes, scryptSync, createHash, timingSafeEqual } from "node:crypto";
 import { text, required, positive, record, safeUrl } from "./store";
 import { countPersonalisationWords } from "../personalisation";
 import type {
@@ -16,6 +16,12 @@ import type {
 } from "./types";
 import { effectivePrice, orderStatuses } from "./types";
 const stamp = () => new Date().toISOString();
+export const enquiryStatuses = ["New", "Contacted", "Quote sent", "Awaiting response", "Converted", "Closed"];
+const MAX_MOVEMENTS = 250;
+/** Keep each product's stock ledger bounded so the database does not grow forever. */
+function trimMovements(inv: { movements: unknown[] }) {
+  if (inv.movements.length > MAX_MOVEMENTS) inv.movements.length = MAX_MOVEMENTS;
+}
 export function normalPhone(value: string) {
   const digits = value.replace(/\D/g, "").replace(/^00/, "");
   return /^0[789]\d{9}$/.test(digits) ? "234" + digits.slice(1) : digits;
@@ -245,11 +251,16 @@ export function createOrder(
   upsertCustomer(b, customerName, phone, email, address);
   return order;
 }
+/** Made-to-order, pre-order and concept items are produced on demand, so they hold no stock. */
+function stockTracked(b: BusinessData, productId: string) {
+  const product = b.products.find((p) => p.id === productId);
+  return !product || !(product.sample || product.availability === "made" || product.availability === "preorder");
+}
 function reserve(b: BusinessData, order: LocalOrder, actor: string) {
   if (order.reserved) return;
   const quantities = new Map<string, number>();
   for (const item of order.items)
-    quantities.set(
+    if (stockTracked(b, item.productId)) quantities.set(
       item.productId,
       (quantities.get(item.productId) || 0) + item.quantity,
     );
@@ -270,6 +281,7 @@ function reserve(b: BusinessData, order: LocalOrder, actor: string) {
       reason: `Reserved for ${order.id}`,
       actor,
     });
+    trimMovements(inv);
   }
   order.reserved = true;
 }
@@ -281,6 +293,7 @@ function release(
 ) {
   if (!order.reserved) return;
   for (const item of order.items) {
+    if (!stockTracked(b, item.productId)) continue;
     const inv = stockFor(b, item.productId);
     inv.reserved = Math.max(0, inv.reserved - item.quantity);
     if (commit) inv.stock = Math.max(0, inv.stock - item.quantity);
@@ -291,6 +304,7 @@ function release(
       reason: `${commit ? "Dispatched" : "Released"} ${order.id}`,
       actor,
     });
+    trimMovements(inv);
   }
   order.reserved = false;
   delete order.holdUntil;
@@ -453,7 +467,8 @@ export function adminAction(
     if (x.maximum !== "" && x.maximum != null) {
       p.maximum = positive(x.maximum, p.minimum, 100000);
       if (!Number.isInteger(p.maximum)) throw new Error("Maximum quantity must be a whole number.");
-    }
+    } else if (x.maximum !== undefined) p.maximum = undefined;
+    else p.maximum = existing?.maximum;
     p.availability = x.availability === "made" || x.availability === "preorder" ? x.availability : "stock";
     p.leadTime = text(x.leadTime, 150);
     p.seoTitle = text(x.seoTitle, 120);
@@ -543,6 +558,7 @@ export function adminAction(
       reason: required(input.reason, "Adjustment reason", 500),
       actor,
     });
+    trimMovements(inv);
     return inv;
   }
   if (action === "recordOrder")
@@ -585,6 +601,8 @@ export function adminAction(
       throw new Error("Create a new order to reopen a cancelled order.");
     if (o.status === "Completed" && status !== "Completed")
       throw new Error("Completed orders are closed.");
+    if (status === "Cancelled" && o.status === "Dispatched")
+      throw new Error("Dispatched orders require a separate return process.");
     if (
       o.paymentStatus === "Paid" &&
       ["Awaiting payment", "Awaiting quotation"].includes(status)
@@ -654,8 +672,11 @@ export function adminAction(
     )
       throw new Error("This order can no longer be quoted.");
     const prices = record(input.prices);
-    for (const [i, item] of o.items.entries())
-      item.unitPrice = positive(prices[String(i)]);
+    for (const [i, item] of o.items.entries()) {
+      const price = positive(prices[String(i)]);
+      if (price <= 0) throw new Error(`Enter a unit price above ₦0 for ${item.name}.`);
+      item.unitPrice = price;
+    }
     const delivery = positive(input.delivery || 0);
     o.total =
       o.items.reduce((n, i) => n + (i.unitPrice ?? 0) * i.quantity, 0) +
@@ -663,6 +684,10 @@ export function adminAction(
     o.status = "Awaiting payment";
     o.quoteIssuedAt = stamp();
     o.deliveryFee = delivery;
+    // Hold the stock for the quoted items so a paying customer is never blocked.
+    // reserve() throws a clear message when stock is short, before anything is saved.
+    reserve(b, o, actor);
+    o.holdUntil = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
     o.updatedAt = stamp();
     o.history.push({
       at: stamp(),
@@ -686,7 +711,9 @@ export function adminAction(
     if (input.id) {
       const e = b.enquiries.find((v) => v.id === input.id);
       if (!e) throw new Error("Enquiry not found.");
-      e.status = required(input.status, "Status", 80);
+      const status = required(input.status, "Status", 80);
+      if (!enquiryStatuses.includes(status)) throw new Error("Choose a valid enquiry status.");
+      e.status = status;
       return e;
     }
     return createEnquiry(b, brand, record(input.enquiry));
@@ -814,8 +841,10 @@ export function adminAction(
       staffName: actor,
     };
     let product: LocalProduct | undefined;
-    if (input.productId)
-      product = b.products.find((p) => p.id === input.productId);
+    if (input.productId) {
+      product = b.products.find((p) => p.id === input.productId && p.status === "published");
+      if (!product) throw new Error("Recommend a published product.");
+    }
     c.messages.push(
       product
         ? {
@@ -861,9 +890,7 @@ export function adminAction(
     const current = db.users.find((u) => u.id === user.id)!;
     const old = required(input.currentPassword, "Current password", 200),
       password = required(input.newPassword, "New password", 200);
-    if (
-      scryptSync(old, current.salt, 64).toString("hex") !== current.passwordHash
-    )
+    if (!timingSafeEqual(scryptSync(old, current.salt, 64), Buffer.from(current.passwordHash, "hex")))
       throw new Error("Current password is incorrect.");
     if (password.length < 10) throw new Error("Use at least ten characters.");
     current.salt = randomBytes(16).toString("hex");

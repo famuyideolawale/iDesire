@@ -1,6 +1,6 @@
 "use client";
 import { addToBag } from "../../../lib/local/bag";
-import { useLocal, asFabric } from "../../../lib/local/client";
+import { useLocal, useFabricCatalogue, whatsappNumber } from "../../../lib/local/client";
 import { notFound, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
@@ -15,15 +15,9 @@ import { FabricServices } from "../../../components/FabricServices";
 
 export default function ProductPage() {
   const params = useParams<{ slug: string }>();
-  const [catalogue, setCatalogue] = useState<Product[]>(seed);
-  const [catalogueLoaded, setCatalogueLoaded] = useState(false);
   const { data: serverData } = useLocal();
-  useEffect(() => {
-    if (serverData) {
-      setCatalogue(serverData.products.map(asFabric));
-      setCatalogueLoaded(true);
-    }
-  }, [serverData]);
+  const catalogue = useFabricCatalogue();
+  const catalogueLoaded = !!serverData;
   const p = catalogue.find((x) => x.slug === params.slug);
   const [colourSlug, setColourSlug] = useState("");
   const [yards, setYards] = useState(5);
@@ -65,20 +59,13 @@ export default function ProductPage() {
     "",
     "Is it available, and what would delivery cost?",
   ].filter(line => line !== undefined).join("\n");
-  const whatsappUrl = `https://wa.me/2348091142201?text=${encodeURIComponent(message)}`;
+  const whatsappUrl = `https://wa.me/${whatsappNumber(serverData?.settings.phone, "2348091142201")}?text=${encodeURIComponent(message)}`;
   return (
     <div className="product-detail page-shell" data-cms-product={p.slug}>
       <div className="detail-image">
         <ProductGallery src={image} alt={p.name + (selectedColour ? " in " + selectedColour.name : "")} />
         {p.colours && (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3,minmax(0,1fr))",
-              gap: 8,
-              marginTop: 10,
-            }}
-          >
+          <div className="colour-thumbs">
             {p.colours.map((c) => (
               <button
                 key={c.slug}
@@ -86,31 +73,9 @@ export default function ProductPage() {
                 onClick={() => setColourSlug(c.slug)}
                 aria-label={`View ${c.name}`}
                 aria-pressed={colourSlug === c.slug}
-                style={{
-                  border:
-                    colourSlug === c.slug
-                      ? "2px solid #79183d"
-                      : "1px solid #ddd",
-                  padding: 3,
-                  background: "#fff",
-                  cursor: "pointer",
-                }}
               >
-                <img
-                  src={c.image}
-                  alt={c.name}
-                  style={{
-                    width: "100%",
-                    height: 90,
-                    objectFit: "cover",
-                    display: "block",
-                  }}
-                />
-                <span
-                  style={{ display: "block", fontSize: 12, padding: "5px 2px" }}
-                >
-                  {c.name}
-                </span>
+                <img src={c.image} alt="" loading="lazy" />
+                <span>{c.name}</span>
               </button>
             ))}
           </div>
@@ -219,7 +184,7 @@ export default function ProductPage() {
           </>
         )}
         <label className="field-label" htmlFor="quantity">
-          Quantity
+          {p.colours ? `Number of ${yards}-yard pieces` : "Number of pieces"}
         </label>
         <div className="quantity-row">
           <input
@@ -233,7 +198,17 @@ export default function ProductPage() {
           />
           <span>Need a larger quantity? Ask about a group order.</span>
         </div>
-        {serverData && p.price !== undefined && <p>{serverData.inventory.find(item => item.productId === p.slug)?.available ?? serverData.inventory.find(item => item.productId === serverData.products.find(product => product.slug === p.slug)?.id)?.available ?? 0} yards available</p>}
+        {serverData && p.price !== undefined && (() => {
+          const id = serverData.products.find(product => product.slug === p.slug)?.id ?? p.slug;
+          const available = serverData.inventory.find(item => item.productId === id)?.available ?? 0;
+          const needed = yards * quantity;
+          return <p className={"stock-note" + (available < needed ? " stock-low" : "")}>
+            {available <= 0 ? "Sold out for now. Ask us about the next delivery."
+              : available < needed ? `Only ${available} yards left. Reduce the quantity or ask about a group order.`
+              : available <= 30 ? `Only ${available} yards left in this colourway.`
+              : "In stock and ready to cut."}
+          </p>;
+        })()}
         {p.price !== undefined && <p className="fabric-subtotal">Fabric subtotal <strong>{naira(p.price * yards * quantity)}</strong></p>}
         {p.sizes?.length ? <label className="field-label">Size <select value={size} onChange={e=>setSize(e.target.value)}>{p.sizes.map(option=><option key={option}>{option}</option>)}</select></label> : null}
         <div className="fabric-actions">

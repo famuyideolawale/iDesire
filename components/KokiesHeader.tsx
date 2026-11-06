@@ -2,19 +2,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, ShoppingBag } from "lucide-react";
+import { useBagCount } from "../lib/local/bag";
 
 const links = [
   { label: "Shop gifts", href: "/kokies-world-of-gift/shop" },
   { label: "Corporate gifting", href: "/kokies-world-of-gift/corporate-gifts" },
   { label: "Personalisation", href: "/kokies-world-of-gift/personalisation" },
   { label: "Our story", href: "/kokies-world-of-gift/about" },
-  { label: "Gift bag", href: "/kokies-world-of-gift/cart" },
 ];
 export default function KokiesHeader() {
   const path = usePathname();
   const [open, setOpen] = useState(false);
   const toggle = useRef<HTMLButtonElement>(null);
+  const bagCount = useBagCount("kokies");
   useEffect(() => setOpen(false), [path]);
   useEffect(() => {
     if (open)
@@ -66,6 +67,9 @@ export default function KokiesHeader() {
         >
           Track an order
         </Link>
+        <Link className="kokies-mobile-contact mobile-sister-link" href="/">
+          iDesire · Asoebi & fabrics ↗
+        </Link>
       </nav>
       <div className="kokies-nav-actions">
         <Link
@@ -73,6 +77,15 @@ export default function KokiesHeader() {
           href="/kokies-world-of-gift/contact"
         >
           Start a gift brief ↗
+        </Link>
+        <Link
+          className="kokies-bag-link"
+          href="/kokies-world-of-gift/cart"
+          aria-label={bagCount ? `Gift bag, ${bagCount} ${bagCount === 1 ? "item" : "items"}` : "Gift bag"}
+          aria-current={path === "/kokies-world-of-gift/cart" ? "page" : undefined}
+        >
+          <ShoppingBag size={20} strokeWidth={1.8} />
+          {bagCount > 0 && <span className="bag-count" aria-hidden="true">{bagCount}</span>}
         </Link>
         <button
           ref={toggle}

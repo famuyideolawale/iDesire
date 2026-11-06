@@ -17,6 +17,15 @@ export function useGiftCatalogue() {
   const { data } = useLocal();
   return data ? data.products.map(asGift) : giftProducts;
 }
+/**
+ * Gifts to list in the shop and on the home page. Sample concepts that reuse a
+ * real product's photo are left out, so the same picture never appears twice.
+ * Their own pages still work, and they return once they have their own photo.
+ */
+export function listedGifts(products: GiftProduct[]) {
+  const realImages = new Set(products.filter((p) => !p.sample).map((p) => p.image));
+  return products.filter((p) => !p.sample || !realImages.has(p.image));
+}
 
 // Copy legacy gift records before either workspace saves a brand-specific register.
 export function migrateGiftRecords() {

@@ -1,4 +1,4 @@
-import { database, parseBrand } from "../../../../../lib/local/store";
+import { readRevision, parseBrand } from "../../../../../lib/local/store";
 import { requireUser } from "../../../../../lib/local/auth";
 import { failure } from "../../../../../lib/local/http";
 export const dynamic = "force-dynamic";
@@ -8,8 +8,8 @@ export async function GET(
 ) {
   try {
     const brand = parseBrand((await params).brand);
-    if (new URL(request.url).searchParams.get("scope") === "admin")
-      await requireUser(brand);
+    // Staff-only: storefronts poll the lightweight revision endpoint instead.
+    await requireUser(brand);
     const encoder = new TextEncoder();
     let timer: ReturnType<typeof setInterval> | undefined;
     let stopped = false;
@@ -29,7 +29,7 @@ export async function GET(
         const tick = async () => {
           if (stopped) return;
           try {
-            const rev = (await database()).businesses[brand].revision;
+            const rev = await readRevision(brand);
             if (rev !== previous) {
               previous = rev;
               controller.enqueue(
@@ -49,7 +49,7 @@ data: ${JSON.stringify({ revision: rev })}
           return;
         }
         void tick();
-        timer = setInterval(() => void tick(), 1200);
+        timer = setInterval(() => void tick(), 3000);
       },
       cancel() {
         stop();

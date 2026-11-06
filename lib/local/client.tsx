@@ -5,9 +5,10 @@ import {
   useEffect,
   useState,
   useCallback,
+  useMemo,
 } from "react";
 import type { Brand, PublicData, LocalProduct } from "./types";
-import type { Product } from "../products";
+import { products as fabricSeed, type Product } from "../products";
 import type { GiftProduct } from "../gift-data";
 export async function api<T = any>(url: string, input?: unknown): Promise<T> {
   const response = await fetch(url, {
@@ -35,12 +36,16 @@ const Context = createContext<{
 }>({ brand: "idesire", data: null, error: "", reload: () => {} });
 export function LocalProvider({
   brand,
+  initialData = null,
   children,
 }: {
   brand: Brand;
+  initialData?: PublicData | null;
   children: React.ReactNode;
 }) {
-  const [data, setData] = useState<PublicData | null>(null),
+  // Server-rendered data shows real prices and copy on first paint; the browser
+  // then keeps it fresh by polling the revision number.
+  const [data, setData] = useState<PublicData | null>(initialData),
     [error, setError] = useState("");
   const reload = useCallback(() => {
     const q = new URLSearchParams(location.search);
@@ -56,10 +61,10 @@ export function LocalProvider({
       .catch((e) => setError(e.message));
   }, [brand]);
   useEffect(() => {
-    setData(null);
-    reload();
-    return watchChanges(brand, reload);
-  }, [brand, reload]);
+    const preview = new URLSearchParams(location.search).get("cmsPreview") === "1";
+    if (!initialData || preview) reload();
+    return watchChanges(brand, reload, preview ? -1 : (initialData?.revision ?? -1), 15000);
+  }, [brand, reload, initialData]);
   return (
     <Context.Provider value={{ brand, data, error, reload }}>
       {children}
@@ -67,6 +72,17 @@ export function LocalProvider({
   );
 }
 export const useLocal = () => useContext(Context);
+/** wa.me links need digits only, with the country code and no leading zero. */
+export function whatsappNumber(phone: string | undefined, fallback: string) {
+  let digits = (phone ?? "").replace(/\D/g, "").replace(/^00/, "");
+  if (/^0[789]\d{9}$/.test(digits)) digits = "234" + digits.slice(1);
+  return digits.length >= 10 ? digits : fallback;
+}
+/** iDesire catalogue: the server's products when available, the built-in list otherwise. */
+export function useFabricCatalogue(): Product[] {
+  const { data } = useContext(Context);
+  return useMemo(() => (data ? data.products.map(asFabric) : fabricSeed), [data]);
+}
 export function asFabric(p: LocalProduct): Product {
   return {
     slug: p.slug,
@@ -108,10 +124,10 @@ export function asGift(p: LocalProduct): GiftProduct {
 
 // Short revision requests keep multiple local editor/store tabs from exhausting
 // the browser's HTTP/1 connection pool with long-lived event streams.
-export function watchChanges(brand: Brand, callback: () => void) {
+export function watchChanges(brand: Brand, callback: () => void, initialRevision = -1, intervalMs = 6000) {
   let stopped = false,
     busy = false,
-    last = -1;
+    last = initialRevision;
   const poll = async () => {
     if (stopped || busy || document.hidden) return;
     busy = true;
@@ -128,8 +144,8 @@ export function watchChanges(brand: Brand, callback: () => void) {
       busy = false;
     }
   };
-  const timer = setInterval(() => void poll(), 6000);
-  void poll();
+  const timer = setInterval(() => void poll(), intervalMs);
+  if (initialRevision < 0) void poll();
   window.addEventListener("focus", poll);
   document.addEventListener("visibilitychange", poll);
   return () => {

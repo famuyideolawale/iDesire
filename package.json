@@ -6,7 +6,8 @@
     "dev": "next dev --port 2030",
     "build": "next build",
     "start": "next start --port 2030",
-    "lint": "next lint"
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1161.0",

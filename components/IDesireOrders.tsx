@@ -271,7 +271,12 @@ function OrderDetail({ order, busy, act, open, go, customers }: {
     <div className="ops-card-head ops-detail-head"><h2>Order Details</h2><span>{order.demo && <em>Demo · </em>}{order.id}</span></div>
     <form onSubmit={e => {
       e.preventDefault();
-      if (!busy) void act({ ...formValues(e.currentTarget), action: "updateOrder", id: order.id });
+      if (busy) return;
+      const values = formValues(e.currentTarget);
+      const next = String(values.status ?? order.status);
+      if (next !== order.status && ["Dispatched", "Cancelled", "Completed"].includes(next) &&
+        !window.confirm(`Move ${order.id} to ${next}? This cannot be undone from here.`)) return;
+      void act({ ...values, action: "updateOrder", id: order.id });
     }}>
       <div className="ops-detail-top">
         <section className="ops-mini ops-customer">
@@ -325,14 +330,20 @@ function OrderDetail({ order, busy, act, open, go, customers }: {
       <div className="ops-notes-grid">
         <section className="ops-mini ops-notes"><h3><FileText size={16} /> Order Notes</h3>
           <textarea aria-label="Order notes" name="notes" rows={4} maxLength={12000} defaultValue={order.notes} placeholder="Add order instructions or delivery details." />
-          <small>Use Update Order to save these notes.</small>
+          <div className="ops-notes-actions">
+            <small>Saved separately from the status.</small>
+            <button type="button" disabled={busy} onClick={e => {
+              const notes = e.currentTarget.closest("section")?.querySelector("textarea")?.value ?? "";
+              void act({ action: "updateOrder", id: order.id, status: order.status, notes });
+            }}>Save notes</button>
+          </div>
         </section>
         <section className="ops-mini ops-activity"><h3><Clock3 size={16} /> Activity Log</h3>
           <CollapsibleSection title="Recorded events" count={history.length} defaultOpen><DataList data={history} label="Activity events" limit={5} mode="load" render={rows => <ol>{rows.map((event, i) => <li key={i}><strong>{event.text}</strong><small>{stamp.format(new Date(event.at))} · {event.actor}</small></li>)}</ol>} /></CollapsibleSection>
         </section>
       </div>
       <div className="ops-actionbar">
-        <button className="ops-primary" disabled={busy}>Update Order</button>
+        <button className="ops-primary" disabled={busy}>Update status</button>
         <button type="button" onClick={() => open("note")}>Add Note</button>
         {canQuote && <button type="button" onClick={() => open("quote")}>Issue / Revise Quote</button>}
         <button type="button" onClick={() => exportOrders([order], order.id)}><Download size={16} /> Export Order</button>
