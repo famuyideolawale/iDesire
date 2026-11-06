@@ -27,12 +27,29 @@ export type LocalProduct = {
   status: "published" | "draft";
   sample?: boolean;
   priceConfirmed?: boolean;
+  sku?: string;
+  collection?: string;
+  sizes?: string[];
+  relatedIds?: string[];
+  salePrice?: number | null;
+  maximum?: number;
+  availability?: "stock" | "made" | "preorder";
+  leadTime?: string;
+  seoTitle?: string;
+  seoDescription?: string;
+  featured?: boolean;
+  newArrival?: boolean;
+  customisation?: "none" | "personalised" | "branded";
+
   gallery?: { src: string; label: string }[];
   colours?: { name: string; slug: string; hex: string; image: string }[];
   yardOptions?: number[];
   label?: string;
   sourceUrl?: string;
 };
+export function effectivePrice(product: LocalProduct) {
+  return product.salePrice ?? product.price;
+}
 export type OrderLine = {
   productId: string;
   name: string;
@@ -40,12 +57,14 @@ export type OrderLine = {
   unitPrice: number | null;
   image: string;
   colour?: string;
+  size?: string;
   personalisation?: Record<string, unknown>;
 };
 export type OrderAsset = { file: string; contentType: string };
 export type LocalOrder = {
   id: string;
   customerName: string;
+  deliveryMethod?: "delivery" | "pickup";
   phone: string;
   email: string;
   address: string;
@@ -61,6 +80,7 @@ export type LocalOrder = {
   reserved: boolean;
   holdUntil?: string;
   checkoutKeyHash?: string;
+  customerAccountId?: string;
   checkoutFingerprint?: string;
   quoteRequired?: boolean;
   artwork?: OrderAsset;
@@ -169,7 +189,12 @@ export type CmsPage = {
   publishedAt: string;
   versions: { id: string; at: string; actor: string; content: PageContent }[];
 };
+export type HeroSlide = {
+  title: string; eyebrow: string; text: string; image: string; mobileImage?: string;
+  alt: string; cta: string; href: string; position?: number; visible?: boolean;
+};
 export type StoreSettings = {
+  heroSlides?: HeroSlide[];
   heroTitle: string;
   heroText: string;
   announcement: string;
@@ -230,7 +255,12 @@ export type SessionUser = {
   sessionVersion?: number;
   createdAt?: string;
 };
+export type CustomerAccount = {
+  id: string; name: string; email: string; salt: string; passwordHash: string;
+  sessions: { hash: string; expiresAt: number }[];
+};
 export type StoreDatabase = {
+  customerAccounts?: Record<Brand, CustomerAccount[]>;
   version: number;
   businesses: Record<Brand, BusinessData>;
   users: (SessionUser & { salt: string; passwordHash: string })[];
@@ -258,6 +288,7 @@ export function pageKey(brand: Brand, path: string) {
             "contact",
             "help",
             "track-order",
+            "account",
             "cart",
           ].includes(key))
       ? "product"

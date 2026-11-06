@@ -14,7 +14,7 @@ import type {
   SessionUser,
   StoreDatabase,
 } from "./types";
-import { orderStatuses } from "./types";
+import { effectivePrice, orderStatuses } from "./types";
 const stamp = () => new Date().toISOString();
 export function normalPhone(value: string) {
   const digits = value.replace(/\D/g, "").replace(/^00/, "");
@@ -121,6 +121,7 @@ export function createOrder(
   input: Record<string, unknown>,
   actor: string,
   manual = false,
+  customerAccountId?: string,
 ): LocalOrder {
   const key = text(input.checkoutKey, 64);
   if (!manual && input.source === "Website checkout" && !key)
@@ -144,9 +145,10 @@ export function createOrder(
     phone = phoneNumber(input.phone),
     email = text(input.email, 200),
     address = text(input.address, 1000);
+  const deliveryMethod = input.deliveryMethod === "pickup" ? "pickup" : "delivery";
   if (!manual && input.kind !== "enquiry") {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address.");
-    if (!address) throw new Error("Delivery address is required.");
+    if (deliveryMethod === "delivery" && !address) throw new Error("Delivery address is required.");
   }
   const rawLines = Array.isArray(input.items)
     ? input.items
@@ -155,6 +157,7 @@ export function createOrder(
           productId: input.productId,
           quantity: input.quantity,
           colour: input.colour,
+          size: input.size,
           personalisation: input.personalisation,
         },
       ];
@@ -171,20 +174,24 @@ export function createOrder(
     const quantity = positive(
       line.quantity,
       manual ? 1 : product.minimum,
-      100000,
+      product.maximum ?? 100000,
     );
     if (!Number.isInteger(quantity))
       throw new Error("Quantities must be whole numbers.");
     const colour = text(line.colour, 100);
+    const size = text(line.size, 100);
+    if ((size || (!manual && product.sizes?.length)) && !product.sizes?.includes(size))
+      throw new Error("Choose an available size for " + product.name + ".");
     if (colour && !product.colours?.some(c => c.name === colour))
       throw new Error("Choose an available colour for " + product.name + ".");
     return {
       productId: product.id,
       name: product.name,
       quantity,
-      unitPrice: product.price,
+      unitPrice: effectivePrice(product),
       image: product.image,
       colour,
+      size,
       personalisation: personalisation(line.personalisation),
     };
   });
@@ -192,7 +199,7 @@ export function createOrder(
     input.kind === "enquiry" ||
     items.some(i => {
       const product = b.products.find(p => p.id === i.productId);
-      return product?.sample || (brand === "kokies" && !manual && product?.priceConfirmed !== true);
+      return product?.sample || product?.availability === "made" || product?.availability === "preorder" || (brand === "kokies" && !manual && product?.priceConfirmed !== true);
     }) ||
     items.some(
       (i) =>
@@ -201,16 +208,17 @@ export function createOrder(
           (!!i.personalisation.productColour && i.personalisation.productColour !== "As pictured"))),
     );
   const order: LocalOrder = {
-    id: `${brand === "idesire" ? "IDT" : "KWG"}-${randomBytes(10).toString("hex").toUpperCase()}`,
+    id: `${brand === "idesire" ? "IDT" : "KOK"}-${new Date().getUTCFullYear()}-${randomBytes(10).toString("hex").toUpperCase()}`,
     customerName,
     phone,
     email,
     address,
+    deliveryMethod,
     items,
     total: items.reduce((n, i) => n + (i.unitPrice ?? 0) * i.quantity, 0),
     status: quote ? "Awaiting quotation" : "Awaiting payment",
     paymentStatus: "Unpaid",
-    source: manual ? "Staff record" : text(input.source) || "Website",
+    source: manual ? (["WhatsApp", "Manual", "Admin"].includes(String(input.source)) ? String(input.source) : "Admin") : "Website",
     notes: text(input.notes ?? input.customisation, 12000),
     createdAt: stamp(),
     updatedAt: stamp(),
@@ -226,6 +234,7 @@ export function createOrder(
     reserved: false,
     quoteRequired: quote,
     checkoutKeyHash: keyHash,
+    customerAccountId,
     checkoutFingerprint: fingerprint,
   };
   if (!quote) {
@@ -426,6 +435,45 @@ export function adminAction(
       priceConfirmed: x.priceConfirmed === true && price !== null,
     };
     const existing = b.products.find((v) => v.id === id);
+    p.sku = text(x.sku, 80);
+    p.collection = text(x.collection, 150);
+    const parseList = (value: unknown) => [...new Set(text(value, 2000).split(",").map(item=>item.trim()).filter(Boolean))].slice(0,30);
+    const existingProduct = b.products.find(product=>product.id===id);
+    p.sizes = x.sizes === undefined ? existingProduct?.sizes : parseList(x.sizes);
+    p.relatedIds = x.relatedIds === undefined ? existingProduct?.relatedIds : parseList(x.relatedIds).map(value => {
+      const product = b.products.find(item => item.id !== id && (item.id === value || item.slug === value));
+      if (!product) throw new Error("Unknown related product: " + value);
+      return product.id;
+    });
+    p.salePrice = x.salePrice === "" || x.salePrice == null ? null : positive(x.salePrice);
+    if (p.salePrice !== null && (price === null || p.salePrice >= price))
+      throw new Error("Sale price must be lower than the regular price.");
+    if (p.sku && b.products.some(item => item.id !== id && item.sku?.toLowerCase() === p.sku?.toLowerCase()))
+      throw new Error("Another product already uses that SKU.");
+    if (x.maximum !== "" && x.maximum != null) {
+      p.maximum = positive(x.maximum, p.minimum, 100000);
+      if (!Number.isInteger(p.maximum)) throw new Error("Maximum quantity must be a whole number.");
+    }
+    p.availability = x.availability === "made" || x.availability === "preorder" ? x.availability : "stock";
+    p.leadTime = text(x.leadTime, 150);
+    p.seoTitle = text(x.seoTitle, 120);
+    p.seoDescription = text(x.seoDescription, 300);
+    p.featured = x.featured === true;
+    p.newArrival = x.newArrival === true;
+    p.customisation = x.customisation === "personalised" || x.customisation === "branded" ? x.customisation : "none";
+    if (x.variants !== undefined) {
+      const variants = text(x.variants, 15000).split(/\r?\n/).filter(Boolean);
+      if (variants.length > 30) throw new Error("Use no more than 30 colour variants.");
+      p.colours = variants.map(line => {
+        const [rawName, rawHex, rawImage] = line.split("|").map(value => value.trim());
+        const name = required(rawName, "Variant name", 100);
+        if (!/^#[0-9a-f]{6}$/i.test(rawHex || "")) throw new Error("Use a hex colour such as #74333A.");
+        return {name, slug: name.toLowerCase().replace(/[^a-z0-9]+/g,"-"), hex: rawHex, image: safeUrl(rawImage || p.image)};
+      });
+      if (new Set(p.colours.map(c => c.slug)).size !== p.colours.length || p.colours.some(c => !/[a-z0-9]/.test(c.slug)))
+        throw new Error("Use distinct colour names containing letters or digits.");
+      if (!p.colours.length) p.colours = undefined;
+    }
     p.gallery = brand === "kokies" && (x.finishImage !== undefined || x.packagingImage !== undefined)
       ? [
           { src: safeUrl(x.finishImage), label: "Finish detail" },
@@ -435,7 +483,7 @@ export function adminAction(
     if (b.products.some((v) => v.id !== id && v.slug === p.slug))
       throw new Error("Another product uses that URL slug.");
     if (existing) {
-      p.colours = existing.colours;
+      if (x.variants === undefined) p.colours = existing.colours;
       p.yardOptions = existing.yardOptions;
       p.sourceUrl = existing.sourceUrl;
       Object.assign(existing, p);
@@ -524,6 +572,15 @@ export function adminAction(
     const status = text(input.status) as LocalOrder["status"];
     if (!orderStatuses.includes(status))
       throw new Error("Invalid order status.");
+    if (status === o.status) {
+      const notes = input.notes === undefined ? o.notes : text(input.notes, 12000);
+      if (notes !== o.notes) {
+        o.notes = notes;
+        o.updatedAt = stamp();
+        o.history.push({ at: o.updatedAt, actor, text: "Order notes updated" });
+      }
+      return o;
+    }
     if (o.status === "Cancelled" && status !== "Cancelled")
       throw new Error("Create a new order to reopen a cancelled order.");
     if (o.status === "Completed" && status !== "Completed")
@@ -655,6 +712,25 @@ export function adminAction(
       .map((t) => t.trim())
       .filter(Boolean);
     return c;
+  }
+  if (action === "saveHeroSlides") {
+    if (!Array.isArray(input.slides) || input.slides.length !== 3)
+      throw new Error("Configure the three campaign slides.");
+    const slides = input.slides.map((entry, index) => {
+      const slide = record(entry);
+      const href = safeUrl(slide.href);
+      if (!href) throw new Error("Each slide needs a destination.");
+      return {
+        title: required(slide.title, "Heading", 160), eyebrow: text(slide.eyebrow, 100),
+        text: text(slide.text, 500), image: safeUrl(required(slide.image, "Desktop image")),
+        mobileImage: safeUrl(slide.mobileImage), alt: required(slide.alt, "Image description", 240),
+        cta: required(slide.cta, "Button label", 60), href,
+        position: positive(slide.position ?? index, 0, 2), visible: slide.visible !== false,
+      };
+    });
+    if (!slides.some(slide => slide.visible)) throw new Error("Keep at least one campaign visible.");
+    b.settings.heroSlides = slides;
+    return slides;
   }
   if (action === "saveSettings") {
     const x = record(input.settings);

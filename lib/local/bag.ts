@@ -3,6 +3,7 @@ export type BagLine = {
   productId: string;
   quantity: number;
   colour?: string;
+  size?: string;
   personalisation?: Record<string, unknown>;
 };
 export function readBag(brand: Brand): BagLine[] {
@@ -22,7 +23,7 @@ export function addToBag(brand: Brand, line: BagLine) {
   const existing = lines.find(
     (l) =>
       l.productId === line.productId &&
-      l.colour === line.colour &&
+      l.colour === line.colour && l.size === line.size &&
       JSON.stringify(l.personalisation) ===
         JSON.stringify(line.personalisation),
   );

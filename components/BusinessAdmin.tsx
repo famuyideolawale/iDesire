@@ -13,12 +13,17 @@ import {
   type SessionUser,
   type LocalProduct,
   type LocalOrder,
-  type Customer,
   type Conversation,
 } from "../lib/local/types";
 import { naira } from "../lib/products";
 import AccountManagement from "./AccountManagement";
 import { canManageAccounts } from "../lib/local/permissions";
+import { CampaignEditor } from "./admin/shared/CampaignEditor";
+import { InventoryWorkspace, CustomersWorkspace, SettingsWorkspace } from "./admin/shared/OperationsWorkspaces";
+import { CollapsibleSection, DataList, Pagination, useDataPage } from "./admin/shared/Density";
+import AdminOverview from "./admin/shared/AdminOverview";
+import { AdminBadge, AdminSection, exportReport, orderChannel } from "./admin/shared/primitives";
+import IDesireOrders from "./IDesireOrders";
 import VisualPageBuilder from "./VisualPageBuilder";
 type DeskData = BusinessData & {
   user: SessionUser;
@@ -29,7 +34,12 @@ type Act = (input: Record<string, unknown>) => Promise<any>;
 const tabs = [
   "Overview",
   "Orders",
+  "Quotes",
+  "Fulfilment",
   "Products",
+  "Collections",
+  "Promotions",
+  "Reports",
   "Inventory",
   "Customers",
   "Enquiries",
@@ -49,7 +59,7 @@ function values(form: HTMLFormElement) {
   return Object.fromEntries(new FormData(form).entries());
 }
 function Badge({ children }: { children: React.ReactNode }) {
-  return <span className="desk-badge">{children}</span>;
+  return <AdminBadge>{children}</AdminBadge>;
 }
 export default function BusinessAdmin({ brand }: { brand: Brand }) {
   const [data, setData] = useState<DeskData | null>(null),
@@ -61,6 +71,17 @@ export default function BusinessAdmin({ brand }: { brand: Brand }) {
     [busy, setBusy] = useState(false),
     [search, setSearch] = useState("");
   const gift = brand === "kokies";
+  const [navigationOpen, setNavigationOpen] = useState(false);
+  const [intent, setIntent] = useState("");
+  const [initialSearch, setInitialSearch] = useState("");
+  const orderSection = ["Orders", "Quotes", "Fulfilment"].includes(tab);
+  const overview = tab === "Overview" || tab === "Reports";
+  const redesignedWorkspace = ["Inventory", "Customers", "Settings", "Accounts"].includes(tab);
+  const atelierOrders = !gift && orderSection && !!data;
+  const go = (section: string, term = "", next = "") => {
+    if (section !== tab) window.scrollTo({ top: 0, behavior: "instant" });
+    setNavigationOpen(false); setTab(section); setSearch(term); setInitialSearch(term); setIntent(next); setNotice("");
+  };
   const load = useCallback(async () => {
     try {
       const d = await api<DeskData>(`/api/local/admin/${brand}`);
@@ -181,7 +202,7 @@ export default function BusinessAdmin({ brand }: { brand: Brand }) {
       </div>
     );
   const nav = (
-    <nav aria-label={`${brandNames[brand]} admin sections`}>
+    <nav id="admin-navigation" className={navigationOpen ? "admin-nav-open" : ""} aria-label={`${brandNames[brand]} admin sections`}>
       {tabs
         .filter((t) => t !== "Accounts" || canManageAccounts(session))
         .map((t) => (
@@ -189,12 +210,10 @@ export default function BusinessAdmin({ brand }: { brand: Brand }) {
             key={t}
             aria-current={tab === t ? "page" : undefined}
             onClick={() => {
-              setTab(t);
-              setSearch("");
-              setNotice("");
+              go(t);
             }}
           >
-            {t}
+            {({ Overview: gift ? "Gift desk" : "Dashboard", "Page builder": "Brand Studio", "Live chat": "Conversations", Activity: "Audit trail" } as Record<string, string>)[t] ?? t}
             {t === "Live chat" &&
               data?.conversations.some((c) => c.unread > 0) && (
                 <b className="unread-dot">
@@ -245,11 +264,14 @@ export default function BusinessAdmin({ brand }: { brand: Brand }) {
         </div>
       </header>
       <div className="desk-layout">
+        <button type="button" className="admin-nav-toggle" aria-controls="admin-navigation" aria-expanded={navigationOpen} onClick={() => setNavigationOpen(!navigationOpen)}>
+          {navigationOpen ? "Close workspace menu" : "Workspace menu"} · {tab}
+        </button>
         {nav}
         <main
-          className={`desk-main ${tab === "Page builder" ? "desk-builder-mode" : ""}`}
+          className={`desk-main desk-mode-${tab.toLowerCase().replaceAll(" ", "-")} ${tab === "Page builder" ? "desk-builder-mode" : ""}`}
         >
-          <div className="desk-title">
+          {!atelierOrders && !(data && (overview || redesignedWorkspace)) && <div className="desk-title">
             <div>
               <span className="desk-kicker">
                 {gift
@@ -268,7 +290,7 @@ export default function BusinessAdmin({ brand }: { brand: Brand }) {
               </p>
             </div>
             <Badge>LOCAL WORKSPACE · LIVE DATA</Badge>
-          </div>
+          </div>}
           {error && (
             <p role="alert" className="desk-error">
               {error}
@@ -286,12 +308,12 @@ export default function BusinessAdmin({ brand }: { brand: Brand }) {
             </p>
           ) : (
             <>
-              <p className="desk-demo-note">
+              {!atelierOrders && !overview && !redesignedWorkspace && <p className="desk-demo-note">
                 Demonstration records are labelled “Demo”. New website
                 submissions arrive here automatically. Payments are confirmed
                 manually.
-              </p>
-              {["Products", "Orders", "Customers", "Enquiries"].includes(
+              </p>}
+              {!atelierOrders && ["Products", "Orders", "Quotes", "Fulfilment", "Enquiries"].includes(
                 tab,
               ) && (
                 <input
@@ -302,29 +324,43 @@ export default function BusinessAdmin({ brand }: { brand: Brand }) {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               )}
-              {tab === "Overview" && <Overview data={data} go={setTab} />}{" "}
+              {overview && <AdminOverview key={tab} data={data} brand={brand} session={session} go={go} reports={tab === "Reports"} signOut={() => void logout()} />}
+              {tab === "Collections" && <AdminSection title="Catalogue collections">
+                <DataList data={[...new Set(data.products.map(p => p.collection || p.category))]} label="Collections" limit={12} render={rows => <div className="admin-collection-grid">{rows.map(collection => {
+                  const members = data.products.filter(p => (p.collection || p.category) === collection);
+                  return <button key={collection} onClick={() => go("Products", collection)}>{members[0]?.image && <img src={members[0].image} alt="" />}<strong>{collection}</strong><small>{members.length} products</small></button>;
+                })}</div>} />
+              </AdminSection>}
+              {tab === "Promotions" && <AdminSection title="Sale pricing">
+                <p>Manage sale prices in the product catalogue. Active sale prices are used at checkout.</p>
+                <button className="desk-primary" onClick={() => go("Products")}>Manage product pricing</button>
+                <DataList data={data.products.filter(p => p.salePrice !== undefined && p.salePrice !== null)} label="Sale products" render={rows => <div>{rows.map(p => <div className="desk-row desk-log" key={p.id}><strong>{p.name}</strong><span>{naira(p.salePrice!)}</span><button onClick={() => go("Products",p.name)}>Open product</button></div>)}</div>} />
+              </AdminSection>}
               {tab === "Products" && (
-                <Products data={data} brand={brand} act={act} search={search} />
+                <Products data={data} brand={brand} act={act} search={search} startNew={intent === "new"} />
               )}{" "}
-              {tab === "Orders" && (
-                <Orders data={data} act={act} search={search} brand={brand} refresh={load} />
+              {orderSection && (
+                gift ? <Orders key={tab} data={data} act={act} search={search} brand={brand} refresh={load} mode={tab} intent={intent} /> :
+                  <IDesireOrders key={tab} data={data} session={session} act={act} busy={busy} error={error}
+                    mode={tab} intent={intent} initialSearch={initialSearch} go={go}
+                    signOut={() => void logout()} />
               )}{" "}
-              {tab === "Inventory" && <Inventory data={data} act={act} />}{" "}
+              {tab === "Inventory" && <InventoryWorkspace data={data} brand={brand} act={act} busy={busy} error={error} />}{" "}
               {tab === "Customers" && (
-                <Customers data={data} act={act} search={search} />
+                <CustomersWorkspace data={data} brand={brand} act={act} busy={busy} error={error} search={search} setSearch={setSearch} openOrder={id => go("Orders", id)} />
               )}{" "}
               {tab === "Enquiries" && (
                 <Enquiries data={data} act={act} search={search} />
               )}{" "}
               {tab === "Live chat" && <Inbox data={data} act={act} />}{" "}
               {tab === "Page builder" && (
-                <VisualPageBuilder
+                <><CampaignEditor data={data} brand={brand} save={act} /><VisualPageBuilder
                   pages={data.pages}
                   sharedDraft={data.sharedDesign?.draft ?? []}
                   brand={brand}
                   act={act}
                   media={data.media}
-                />
+                /></>
               )}{" "}
               {tab === "Media" && (
                 <MediaLibrary
@@ -335,19 +371,21 @@ export default function BusinessAdmin({ brand }: { brand: Brand }) {
                   onError={setError}
                 />
               )}{" "}
-              {tab === "Settings" && <Settings data={data} act={act} />}
+              {tab === "Settings" && <SettingsWorkspace data={data} brand={brand} act={act} busy={busy} error={error} user={data.user} staff={data.staff} go={go} initialSection={intent === "security" ? "Data & security" : undefined} />}
               {tab === "Accounts" && canManageAccounts(data.user) && (
                 <AccountManagement
                   user={data.user}
                   accounts={data.accounts}
                   brand={brand}
                   act={act}
+                  error={error}
+                  openSecurity={() => go("Settings", "", "security")}
                 />
               )}{" "}
               {tab === "Activity" && (
                 <section className="desk-card">
                   <h2>Workspace audit trail</h2>
-                  {data.audit.slice(0, 100).map((a) => (
+                  <DataList data={data.audit} label="Audit events" limit={20} render={rows => <div>{rows.map((a) => (
                     <div className="desk-row desk-log" key={a.id}>
                       <span>
                         <strong>{a.action}</strong>
@@ -358,7 +396,7 @@ export default function BusinessAdmin({ brand }: { brand: Brand }) {
                         <small>{fmt(a.at)}</small>
                       </span>
                     </div>
-                  ))}
+                  ))}</div>} />
                 </section>
               )}
             </>
@@ -368,113 +406,26 @@ export default function BusinessAdmin({ brand }: { brand: Brand }) {
     </div>
   );
 }
-function Overview({ data, go }: { data: DeskData; go: (t: string) => void }) {
-  const stats = [
-    [
-      "Open orders",
-      data.orders.filter((o) => !["Completed", "Cancelled"].includes(o.status))
-        .length,
-      "Orders",
-    ],
-    [
-      "Collected revenue",
-      naira(
-        data.orders
-          .filter((o) => !o.demo && o.paymentStatus === "Paid")
-          .reduce((n, o) => n + o.total, 0),
-      ),
-      "Orders",
-    ],
-    [
-      "Waiting conversations",
-      data.conversations.filter((c) => c.status === "Waiting").length,
-      "Live chat",
-    ],
-    [
-      "Low stock alerts",
-      data.inventory.filter(
-        (i) =>
-          data.products.some((p) => p.id === i.productId) &&
-          i.stock - i.reserved <= i.threshold,
-      ).length,
-      "Inventory",
-    ],
-  ];
-  return (
-    <>
-      <div className="desk-stats">
-        {stats.map(([label, n, t]) => (
-          <button key={String(label)} onClick={() => go(String(t))}>
-            <span>{label}</span>
-            <strong>{n}</strong>
-            <small>View details ↗</small>
-          </button>
-        ))}
-      </div>
-      <div className="desk-two">
-        <section className="desk-card">
-          <div className="desk-row">
-            <h2>Orders in motion</h2>
-            <button onClick={() => go("Orders")}>All orders ↗</button>
-          </div>
-          {data.orders
-            .filter((o) => !["Cancelled", "Completed"].includes(o.status))
-            .slice(0, 6)
-            .map((o) => (
-              <div className="desk-row desk-log" key={o.id}>
-                <span>
-                  <strong>{o.customerName}</strong>
-                  <small>
-                    {o.id} {o.demo ? "· Demo" : ""}
-                  </small>
-                </span>
-                <Badge>{o.status}</Badge>
-              </div>
-            ))}
-        </section>
-        <section className="desk-card">
-          <h2>Your next actions</h2>
-          <p>
-            {data.enquiries.filter((e) => e.status === "New").length} new
-            enquiries need a response.
-          </p>
-          <p>
-            {data.conversations.reduce((n, c) => n + c.unread, 0)} unread chat
-            messages.
-          </p>
-          <div className="desk-actions">
-            <button onClick={() => go("Enquiries")}>Review enquiries</button>
-            <button onClick={() => go("Page builder")}>
-              Open Brand Studio
-            </button>
-          </div>
-          <h3>Newsletter audience</h3>
-          <p>
-            {data.subscribers.length} subscribers registered with this brand.
-          </p>
-          {data.subscribers.slice(0, 4).map((s) => (
-            <small className="desk-line" key={s.id}>
-              {s.email}
-            </small>
-          ))}
-        </section>
-      </div>
-    </>
-  );
-}
 function Products({
   data,
   brand,
   act,
-  search,
+  search, startNew,
 }: {
   data: DeskData;
   brand: Brand;
   act: Act;
-  search: string;
+  search: string; startNew: boolean;
 }) {
   const [selected, setSelected] = useState<LocalProduct | null>(null),
-    [newItem, setNew] = useState(false);
+    [newItem, setNew] = useState(startNew);
+  const [category, setCategory] = useState("");
+  const [productSort, setProductSort] = useState("catalogue");
+  const productResults = data.products.filter(p => (!category || p.category === category) &&
+    [p.name, p.category, p.sku, p.collection].join(" ").toLowerCase().includes(search.trim().toLowerCase()));
+  if (productSort === "name") productResults.sort((a,b) => a.name.localeCompare(b.name));
+  if (productSort === "price") productResults.sort((a,b) => (a.price ?? Infinity) - (b.price ?? Infinity));
+
   return (
     <>
       <div className="desk-row">
@@ -508,6 +459,8 @@ function Products({
                   price: v.price === "" ? null : Number(v.price),
                   minimum: Number(v.minimum),
                   sample: v.sample === "on",
+                  featured: v.featured === "on",
+                  newArrival: v.newArrival === "on",
                   priceConfirmed: v.priceConfirmed === "on",
                 },
               });
@@ -522,6 +475,22 @@ function Products({
                 Name
                 <input name="name" defaultValue={selected?.name} required />
               </label>
+              <label className="wide">Colour variants (one per line: name | #hex | image path)
+                <textarea name="variants" rows={3} defaultValue={selected?.colours?.map(c => [c.name,c.hex,c.image].join(" | ")).join("\n")} />
+              </label>
+              <label>Sizes (comma separated)<input name="sizes" defaultValue={selected?.sizes?.join(", ")} /></label>
+              <label>Related products (IDs or slugs)<input name="relatedIds" defaultValue={selected?.relatedIds?.join(", ")} /></label>
+              <label>SKU<input name="sku" defaultValue={selected?.sku} /></label>
+              <label>Collection<input name="collection" defaultValue={selected?.collection} /></label>
+              <label>Sale price (₦)<input name="salePrice" type="number" min="0" step="0.01" defaultValue={selected?.salePrice ?? ""} /></label>
+              <label>Maximum quantity<input name="maximum" type="number" min="1" step="1" defaultValue={selected?.maximum} /></label>
+              <label>Customisation<select name="customisation" defaultValue={selected?.customisation ?? (brand === "kokies" ? "personalised" : "none")}><option value="none">Non-personalised</option><option value="personalised">Personalised</option><option value="branded">Branded</option></select></label>
+              <label>Lead time<input name="leadTime" defaultValue={selected?.leadTime} placeholder="e.g. 5–7 working days" /></label>
+              <label>Availability<select name="availability" defaultValue={selected?.availability ?? "stock"}><option value="stock">Stock tracked</option><option value="made">Made to order</option><option value="preorder">Pre-order</option></select></label>
+              <label>SEO title<input name="seoTitle" defaultValue={selected?.seoTitle} /></label>
+              <label>SEO description<input name="seoDescription" defaultValue={selected?.seoDescription} /></label>
+              <label className="desk-check"><input type="checkbox" name="featured" defaultChecked={selected?.featured} /> Featured product</label>
+              <label className="desk-check"><input type="checkbox" name="newArrival" defaultChecked={selected?.newArrival} /> New arrival</label>
               <label>
                 URL slug
                 <input name="slug" defaultValue={selected?.slug} />
@@ -624,16 +593,13 @@ function Products({
           </form>
         </section>
       )}
-      <div className="desk-product-grid">
-        {data.products
-          .filter((p) =>
-            (p.name + " " + p.category)
-              .toLowerCase()
-              .includes(search.toLowerCase()),
-          )
-          .map((p) => (
+      <div className="workspace-toolbar admin-catalogue-tools">
+        <select aria-label="Filter product category" value={category} onChange={e => setCategory(e.target.value)}><option value="">All categories</option>{[...new Set(data.products.map(p => p.category))].sort().map(name => <option key={name}>{name}</option>)}</select>
+        <select aria-label="Sort products" value={productSort} onChange={e => setProductSort(e.target.value)}><option value="catalogue">Catalogue order</option><option value="name">Name A–Z</option><option value="price">Lowest price</option></select>
+      </div>
+      <DataList data={productResults} label="Products" limit={12} resetKey={JSON.stringify([search, category, productSort])} render={rows => <div className="desk-product-grid">{rows.map(p => (
             <article className="desk-product" key={p.id}>
-              <img src={p.image} alt={p.name} />
+              <img src={p.image} alt={p.name} loading="lazy" />
               <div>
                 <Badge>
                   {p.status}
@@ -668,8 +634,7 @@ function Products({
                 </div>
               </div>
             </article>
-          ))}
-      </div>
+          ))}</div>} />
     </>
   );
 }
@@ -677,20 +642,27 @@ function Orders({
   brand, refresh,
   data,
   act,
-  search,
+  search, mode, intent,
 }: {
   brand: Brand; refresh: () => Promise<void>;
   data: DeskData;
   act: Act;
-  search: string;
+  search: string; mode: string; intent: string;
 }) {
   const [id, setId] = useState(""),
-    [filter, setFilter] = useState("All"),
-    [creating, setCreating] = useState(false);
+    [filter, setFilter] = useState(orderStatuses.some(s => s === intent) ? intent : mode === "Quotes" ? "Awaiting quotation" : mode === "Fulfilment" ? "Fulfilment" : "All"),
+    [creating, setCreating] = useState(intent === "new");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [payment, setPayment] = useState("All payments");
+  const [sort, setSort] = useState("Latest");
+  const filtered = data.orders.filter(o => (filter === "All" || o.status === filter || (filter === "Fulfilment" && ["Paid","Processing","Ready for dispatch","Dispatched"].includes(o.status))) && (payment === "All payments" || o.paymentStatus === payment) && (!from || o.createdAt.slice(0,10) >= from) && (!to || o.createdAt.slice(0,10) <= to) && JSON.stringify(o).toLowerCase().includes(search.toLowerCase())).sort((a,b) => sort === "Highest value" ? b.total-a.total : sort === "Oldest" ? Date.parse(a.createdAt)-Date.parse(b.createdAt) : Date.parse(b.createdAt)-Date.parse(a.createdAt));
+  const page = useDataPage(filtered, 12, JSON.stringify([search, filter, payment, from, to, sort]));
   const order = data.orders.find((o) => o.id === id);
   return (
-    <>
-      <div className="desk-row">
+    <div className="gift-order-workspace">
+      <div className="gift-order-summary"><strong>{filtered.length} matching gift orders</strong><span>{filtered.filter(o => o.status === "Awaiting quotation").length} to quote</span><span>{filtered.filter(o => o.status === "Ready for dispatch").length} ready to pack</span></div>
+      <div className="desk-row gift-order-controls">
         <div className="order-queues" aria-label="Order queues">
           {[["Awaiting quotation", "Quotes"], ["Awaiting payment", "Verify payments"], ["Fulfilment", "Fulfilment"]].map(([value, label]) => (
             <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}</button>
@@ -707,6 +679,10 @@ function Orders({
             <option key={s}>{s}</option>
           ))}
         </select>
+        <label>Payment<select value={payment} onChange={e => setPayment(e.target.value)}><option>All payments</option><option>Paid</option><option>Unpaid</option></select></label>
+        <label>From<input type="date" value={from} onChange={e => setFrom(e.target.value)} /></label><label>To<input type="date" value={to} onChange={e => setTo(e.target.value)} /></label>
+        <label>Sort<select value={sort} onChange={e => setSort(e.target.value)}><option>Latest</option><option>Oldest</option><option>Highest value</option></select></label>
+        <button onClick={() => exportReport("kokies-orders", [["Order","Channel","Status","Total"],...filtered.map(o=>[o.id,orderChannel(o),o.status,o.total])])}>Export</button>
         <button onClick={() => setCreating(!creating)}>+ Record order</button>
       </div>
       {creating && (
@@ -716,7 +692,7 @@ function Orders({
             onSubmit={async (e) => {
               e.preventDefault();
               const v = values(e.currentTarget);
-              const r = await act({ action: "recordOrder", order: v });
+              const r = await act({ action: "recordOrder", order: { ...v, kind: mode === "Quotes" ? "enquiry" : undefined } });
               if (r) {
                 setId(r.id);
                 setCreating(false);
@@ -774,20 +750,17 @@ function Orders({
       )}
       <div className="desk-split">
         <div className="desk-list">
-          {data.orders
-            .filter(
-              (o) =>
-                (filter === "All" || o.status === filter || (filter === "Fulfilment" && ["Paid", "Processing", "Ready for dispatch", "Dispatched"].includes(o.status))) &&
-                JSON.stringify(o).toLowerCase().includes(search.toLowerCase()),
-            )
-            .map((o) => (
+          {page.rows.map((o) => (
               <button
                 key={o.id}
                 aria-pressed={id === o.id}
                 onClick={() => setId(o.id)}
               >
+                {o.items[0]?.image && <img src={o.items[0].image} alt="" />}
                 <span>
                   <strong>{o.customerName}</strong>
+                  <small>{o.items[0]?.name} · {o.items.reduce((sum,i)=>sum+i.quantity,0)} units</small>
+                  <small>{orderChannel(o)}{o.items.some(i=>i.personalisation && i.personalisation.method !== "none") ? " · Personalisation" : ""}</small>
                   <small>
                     {o.id}
                     {o.demo ? " · Demo" : ""}
@@ -797,6 +770,7 @@ function Orders({
                 <b>{naira(o.total)}</b>
               </button>
             ))}
+          <Pagination state={page} label="Gift order pages" />
         </div>
         <section className="desk-card desk-detail">
           {order ? (
@@ -821,7 +795,7 @@ function Orders({
           )}
         </section>
       </div>
-    </>
+    </div>
   );
 }
 function OrderDetail({ order: o, act, brand, refresh }: { order: LocalOrder; act: Act; brand: Brand; refresh: () => Promise<void> }) {
@@ -839,10 +813,10 @@ function OrderDetail({ order: o, act, brand, refresh }: { order: LocalOrder; act
         <br />
         {o.email}
         <br />
-        {o.address}
+        {o.deliveryMethod === "pickup" ? "Customer pickup" : o.address}
       </p>
       <Badge>{o.paymentStatus}</Badge>
-      {o.items.map((i, n) => (
+      <DataList data={o.items} label="Order items" limit={5} render={rows => <div>{rows.map((i, n) => (
         <article className="desk-order-item" key={n}>
           <img src={i.image} alt={i.name} />
           <div>
@@ -850,7 +824,7 @@ function OrderDetail({ order: o, act, brand, refresh }: { order: LocalOrder; act
             <p>
               {i.quantity} ×{" "}
               {i.unitPrice === null ? "To quote" : naira(i.unitPrice)}{" "}
-              {i.colour && `· ${i.colour}`}
+              {i.colour && `· ${i.colour}`}{i.size && " · " + i.size}
             </p>
             {i.personalisation && (
               <details open>
@@ -865,7 +839,7 @@ function OrderDetail({ order: o, act, brand, refresh }: { order: LocalOrder; act
             )}
           </div>
         </article>
-      ))}
+      ))}</div>} />
       <h3>Recorded order total {naira(o.total)}</h3>
       <p>
         Personalisation and delivery costs need a confirmed quote where
@@ -956,14 +930,14 @@ function OrderDetail({ order: o, act, brand, refresh }: { order: LocalOrder; act
       {brand === "kokies" && <OrderArtwork key={o.id} reference={o.id} staff hasArtwork={!!o.artwork} proof={o.proof}
         editable={["Awaiting quotation", "Awaiting payment", "Paid"].includes(o.status)} refresh={refresh} />}
       <h3>History & staff notes</h3>
-      {o.history.map((h, i) => (
+      <CollapsibleSection title="Order history" count={o.history.length}><DataList data={o.history} label="History events" limit={8} render={rows => <div>{rows.map((h, i) => (
         <div className="desk-log" key={i}>
           <p>{h.text}</p>
           <small>
             {h.actor} · {fmt(h.at)}
           </small>
         </div>
-      ))}
+      ))}</div>} /></CollapsibleSection>
       <form
         onSubmit={async (e) => {
           e.preventDefault();
@@ -985,176 +959,6 @@ function OrderDetail({ order: o, act, brand, refresh }: { order: LocalOrder; act
     </>
   );
 }
-function Inventory({ data, act }: { data: DeskData; act: Act }) {
-  return (
-    <div className="desk-card">
-      <h2>Stock & movement ledger</h2>
-      <p>
-        Available = physical stock − reserved stock. Every adjustment requires a
-        reason.
-      </p>
-      {data.inventory.map((i) => {
-        const p = data.products.find((p) => p.id === i.productId);
-        return !p ? null : (
-          <details className="desk-inventory" key={i.productId}>
-            <summary>
-              <strong>{p.name}</strong>
-              <span>
-                {i.stock} physical / {i.reserved} reserved /{" "}
-                {i.stock - i.reserved} available
-              </span>
-              {i.stock - i.reserved <= i.threshold && <Badge>Low stock</Badge>}
-            </summary>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void act({
-                  action: "saveInventory",
-                  id: i.productId,
-                  ...values(e.currentTarget),
-                });
-              }}
-            >
-              <div className="desk-fields">
-                <label>
-                  Physical stock
-                  <input
-                    name="stock"
-                    type="number"
-                    min={i.reserved}
-                    step="1"
-                    defaultValue={i.stock}
-                    required
-                  />
-                </label>
-                <label>
-                  Low stock threshold
-                  <input
-                    name="threshold"
-                    type="number"
-                    min="0"
-                    defaultValue={i.threshold}
-                    required
-                  />
-                </label>
-                <label>
-                  Adjustment reason
-                  <input
-                    name="reason"
-                    required
-                    placeholder="Restock, stock count correction…"
-                  />
-                </label>
-              </div>
-              <button>Save adjustment</button>
-            </form>
-            {i.movements.slice(0, 10).map((m) => (
-              <p key={m.id}>
-                {m.quantity > 0 ? "+" : ""}
-                {m.quantity} · {m.reason}
-                <small className="desk-line">
-                  {m.actor} · {fmt(m.at)}
-                </small>
-              </p>
-            ))}
-          </details>
-        );
-      })}
-    </div>
-  );
-}
-function Customers({
-  data,
-  act,
-  search,
-}: {
-  data: DeskData;
-  act: Act;
-  search: string;
-}) {
-  const [id, setId] = useState("");
-  const c = data.customers.find((c) => c.id === id);
-  return (
-    <div className="desk-split">
-      <div className="desk-list">
-        <button onClick={() => setId("new")}>+ Add customer</button>
-        {data.customers
-          .filter((c) =>
-            JSON.stringify(c).toLowerCase().includes(search.toLowerCase()),
-          )
-          .map((c) => (
-            <button key={c.id} onClick={() => setId(c.id)}>
-              <strong>{c.name}</strong>
-              <small>
-                {c.email} · {c.phone}
-              </small>
-              <span>
-                {c.tags.join(" · ")} {c.demo ? "· Demo" : ""}
-              </span>
-            </button>
-          ))}
-      </div>
-      <section className="desk-card">
-        {id ? (
-          <>
-            <h2>{c?.name || "New customer"}</h2>
-            <form
-              key={id}
-              onSubmit={(e) => {
-                e.preventDefault();
-                void act({
-                  action: "saveCustomer",
-                  customer: { ...values(e.currentTarget), id: c?.id },
-                });
-              }}
-            >
-              <div className="desk-fields">
-                <label>
-                  Name
-                  <input name="name" defaultValue={c?.name} required />
-                </label>
-                <label>
-                  Phone
-                  <input name="phone" defaultValue={c?.phone} required />
-                </label>
-                <label>
-                  Email
-                  <input name="email" type="email" defaultValue={c?.email} />
-                </label>
-                <label>
-                  City
-                  <input name="city" defaultValue={c?.city} />
-                </label>
-                <label>
-                  Tags (comma separated)
-                  <input name="tags" defaultValue={c?.tags.join(", ")} />
-                </label>
-                <label className="wide">
-                  Staff notes
-                  <textarea name="notes" defaultValue={c?.notes} />
-                </label>
-              </div>
-              <button className="desk-primary">Save customer</button>
-            </form>
-            <h3>Order history</h3>
-            {data.orders
-              .filter((o) => c && (o.phone === c.phone || o.email === c.email))
-              .map((o) => (
-                <p key={o.id}>
-                  {o.id} · {o.status} · {naira(o.total)}
-                </p>
-              ))}
-          </>
-        ) : (
-          <>
-            <h2>Customer book</h2>
-            <p>Select a customer for notes, tags and order history.</p>
-          </>
-        )}
-      </section>
-    </div>
-  );
-}
 function Enquiries({
   data,
   act,
@@ -1165,12 +969,7 @@ function Enquiries({
   search: string;
 }) {
   return (
-    <div className="desk-two">
-      {data.enquiries
-        .filter((e) =>
-          JSON.stringify(e).toLowerCase().includes(search.toLowerCase()),
-        )
-        .map((e) => (
+    <DataList data={data.enquiries.filter(e => JSON.stringify(e).toLowerCase().includes(search.toLowerCase()))} label="Enquiries" limit={8} resetKey={search} render={rows => <div className="desk-two">{rows.map(e => (
           <article className="desk-card" key={e.id}>
             <div className="desk-row">
               <h2>{e.customerName}</h2>
@@ -1217,8 +1016,7 @@ function Enquiries({
               <button>Update enquiry</button>
             </form>
           </article>
-        ))}
-    </div>
+        ))}</div>} />
   );
 }
 function Inbox({ data, act }: { data: DeskData; act: Act }) {
@@ -1244,10 +1042,7 @@ function Inbox({ data, act }: { data: DeskData; act: Act }) {
         </select>
       </div>
       <div className="desk-split">
-        <div className="desk-list">
-          {data.conversations
-            .filter((c) => filter === "All" || c.status === filter)
-            .map((c) => (
+        <div><DataList data={data.conversations.filter(c => filter === "All" || c.status === filter)} label="Conversations" limit={12} resetKey={filter} render={rows => <div className="desk-list">{rows.map(c => (
               <button
                 key={c.id}
                 aria-pressed={id === c.id}
@@ -1266,8 +1061,7 @@ function Inbox({ data, act }: { data: DeskData; act: Act }) {
                   {c.demo ? " · Demo" : ""}
                 </Badge>
               </button>
-            ))}
-        </div>
+            ))}</div>} /></div>
         <section className="desk-card">
           {c ? (
             <ChatDetail key={c.id} conversation={c} data={data} act={act} />
@@ -1298,8 +1092,10 @@ function ChatDetail({
     <>
       <h2>{c.name}</h2>
       <p>{c.email || "Visitor has not shared an email."}</p>
-      <div className="desk-chat-thread">
-        {c.messages.map((m) => (
+      <small>{data.user.brands.length === 1 ? brandNames[data.user.brands[0]] : "Current brand inbox"}</small>
+      {c.email && <div>{data.orders.filter(o => o.email.toLowerCase() === c.email.toLowerCase()).slice(0,3).map(o => <p key={o.id}>{o.id} · {o.status}</p>)}</div>}
+      <DataList data={[...c.messages].reverse()} label="Messages, newest first" limit={15} resetKey={c.id} render={rows => <div className="desk-chat-thread">
+        {[...rows].reverse().map((m) => (
           <article key={m.id} className={`desk-message ${m.from}`}>
             <strong>
               {m.from === "visitor" ? c.name : m.staffName || "Team"}
@@ -1314,7 +1110,7 @@ function ChatDetail({
             <small>{fmt(m.at)}</small>
           </article>
         ))}
-      </div>
+      </div>} />
       <form
         onSubmit={async (e) => {
           e.preventDefault();
@@ -1446,10 +1242,9 @@ function MediaLibrary({
         </form>
         <p role="status">{status}</p>
       </section>
-      <div className="desk-product-grid">
-        {data.media.map((m) => (
+      <DataList data={data.media} label="Media" limit={12} render={rows => <div className="desk-product-grid">{rows.map(m => (
           <article className="desk-product" key={m.id}>
-            <img src={m.src} alt={m.alt} />
+            <img src={m.src} alt={m.alt} loading="lazy" />
             <div>
               <h3>{m.name}</h3>
               <button
@@ -1467,112 +1262,7 @@ function MediaLibrary({
               </label>
             </div>
           </article>
-        ))}
-      </div>
+        ))}</div>} />
     </>
-  );
-}
-function Settings({ data, act }: { data: DeskData; act: Act }) {
-  return (
-    <div className="desk-two">
-      <section className="desk-card">
-        <h2>Brand settings</h2>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            const v = values(e.currentTarget);
-            void act({
-              action: "saveSettings",
-              settings: { ...v, chatOnline: v.chatOnline === "on" },
-            });
-          }}
-        >
-          <div className="desk-fields single">
-            {Object.entries(data.settings)
-              .filter(([key]) => key !== "chatOnline")
-              .map(([key, value]) => (
-                <label key={key}>
-                  {key.replace(/([A-Z])/g, " $1")}
-                  <input name={key} defaultValue={String(value)} />
-                </label>
-              ))}
-            <label className="desk-check">
-              <input
-                type="checkbox"
-                name="chatOnline"
-                defaultChecked={data.settings.chatOnline}
-              />
-              Team available in live chat
-            </label>
-          </div>
-          <button className="desk-primary">Save brand settings</button>
-        </form>
-      </section>
-      <section className="desk-card">
-        <h2>Your account</h2>
-        <p>
-          {data.user.name} · {data.user.role}
-          <br />
-          {data.user.username || data.user.email}
-        </p>
-        {canManageAccounts(data.user) && (
-          <p>Create and manage staff in the Accounts section.</p>
-        )}
-        <h3>Change your password</h3>
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            const form = e.currentTarget;
-            const r = await act({ action: "changePassword", ...values(form) });
-            if (r) form.reset();
-          }}
-        >
-          <label>
-            Current password
-            <input
-              name="currentPassword"
-              type="password"
-              autoComplete="current-password"
-              required
-            />
-          </label>
-          <label>
-            New password
-            <input
-              name="newPassword"
-              type="password"
-              autoComplete="new-password"
-              minLength={10}
-              required
-            />
-          </label>
-          <button>Update password</button>
-        </form>
-        <h3>Local data</h3>
-        <button
-          onClick={() => {
-            const { user, staff, ...backup } = data;
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(
-              new Blob([JSON.stringify(backup, null, 2)], {
-                type: "application/json",
-              }),
-            );
-            a.download =
-              "workspace-export-" +
-              new Date().toISOString().slice(0, 10) +
-              ".json";
-            a.click();
-            URL.revokeObjectURL(a.href);
-          }}
-        >
-          Export this workspace
-        </button>
-        <p>
-          Export a workspace snapshot for your records. External payment
-          and delivery services are not connected.
-        </p>
-      </section>
-    </div>
   );
 }

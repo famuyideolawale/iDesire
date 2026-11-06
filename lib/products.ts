@@ -1,5 +1,5 @@
 export type ProductColour = { name: string; slug: string; hex: string; image: string };
-export type Product = { slug:string; name:string; category:string; price?:number; image:string; label?:string; description:string; colours?:ProductColour[]; yardOptions?:number[]; minimumYards?:number; sourceUrl?:string; sample?:boolean };
+export type Product = { slug:string; name:string; category:string; price?:number; image:string; label?:string; description:string; colours?:ProductColour[]; yardOptions?:number[]; minimumYards?:number; sourceUrl?:string; sample?:boolean; id?:string; sizes?:string[]; collection?:string; relatedIds?:string[]; featured?:boolean; newArrival?:boolean };
 
 export const royalBloomColours: ProductColour[] = [
  {name:'Wine',slug:'wine',hex:'#7b142d',image:'/products/royal-bloom-wine.webp'},

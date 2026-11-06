@@ -64,6 +64,7 @@ export default function StoreShell({
               <Link href="/kokies-world-of-gift/contact">
                 Contact & enquiries
               </Link>
+              <Link href="/kokies-world-of-gift/account">Your account</Link>
               <Link href="/kokies-world-of-gift/track-order">
                 Track your order
               </Link>

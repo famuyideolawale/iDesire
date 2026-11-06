@@ -1,4 +1,5 @@
 "use client";
+import { CollapsibleSection, DataList } from "./admin/shared/Density";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   Brand,
@@ -504,11 +505,11 @@ function Editor({
                         ))}
                       </select>
                     </label>
-                    <div
+                    <DataList data={media} label="Image thumbnails" limit={12} render={rows => <div
                       className="visual-media-grid"
                       aria-label="Brand image thumbnails"
                     >
-                      {media.slice(0, 30).map((m) => (
+                      {rows.map((m) => (
                         <button
                           key={m.id}
                           title={m.name}
@@ -522,7 +523,7 @@ function Editor({
                           />
                         </button>
                       ))}
-                    </div>
+                    </div>} />
                     <label>
                       Image URL
                       <input
@@ -809,9 +810,10 @@ function Editor({
               >
                 Open saved draft preview ↗
               </a>
-              <h3>Version history</h3>
-              {page.versions.length ? (
-                page.versions.map((v) => (
+              <CollapsibleSection key={page.id} title="Version history" count={page.versions.length}>
+                <DataList data={page.versions} label="Published versions" limit={6}
+                  empty={<p className="visual-help">Published versions appear here after publishing.</p>}
+                  render={rows => <div>{rows.map((v) => (
                   <div className="visual-version" key={v.id}>
                     <small>
                       {new Date(v.at).toLocaleString()}
@@ -856,13 +858,8 @@ function Editor({
                       Restore draft
                     </button>
                   </div>
-                ))
-              ) : (
-                <p className="visual-help">
-                  Your previous published page is saved here each time you
-                  publish.
-                </p>
-              )}
+                ))}</div>} />
+              </CollapsibleSection>
             </>
           )}
         </aside>

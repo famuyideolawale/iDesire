@@ -25,6 +25,7 @@ export default function Footer() {
           <Link href="/contact">Contact us</Link>
           <Link href="/track-order">Track your order</Link>
           <Link href="/customisation">Customisation</Link>
+          <Link href="/account">Your account</Link>
         </div>
         <div>
           <h4>Stay in the loop</h4>

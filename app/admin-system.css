@@ -1,0 +1,108 @@
+@font-face { font-family: Admin Cormorant; src: url('/fonts/admin/cormorantgaramond-latin-ext.woff2') format('woff2'); font-weight: 500 700; font-display: swap; unicode-range: U+0100-02FF,U+1E00-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113; }
+@font-face { font-family: Admin Cormorant; src: url('/fonts/admin/cormorantgaramond-latin.woff2') format('woff2'); font-weight: 500 700; font-display: swap; unicode-range: U+0000-00FF,U+0300-036F,U+2000-206F,U+20AC,U+2122,U+2190-2199,U+2212; }
+@font-face { font-family: Admin Inter; src: url('/fonts/admin/inter-latin-ext.woff2') format('woff2'); font-weight: 400 700; font-display: swap; unicode-range: U+0100-02FF,U+1E00-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113; }
+@font-face { font-family: Admin Inter; src: url('/fonts/admin/inter-latin.woff2') format('woff2'); font-weight: 400 700; font-display: swap; unicode-range: U+0000-00FF,U+0300-036F,U+2000-206F,U+20AC,U+2122,U+2190-2199,U+2212; }
+@font-face { font-family: Admin DM Sans; src: url('/fonts/admin/dmsans-latin-ext.woff2') format('woff2'); font-weight: 400 700; font-display: swap; unicode-range: U+0100-02FF,U+1E00-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113; }
+@font-face { font-family: Admin DM Sans; src: url('/fonts/admin/dmsans-latin.woff2') format('woff2'); font-weight: 400 700; font-display: swap; unicode-range: U+0000-00FF,U+0300-036F,U+2000-206F,U+20AC,U+2122,U+2190-2199,U+2212; }
+
+.business-desk {
+  --admin-control-radius: 8px;
+  --admin-control-height: 42px;
+  --admin-title: clamp(35px, 4vw, 56px);
+  --admin-section-title: clamp(23px, 2.1vw, 32px);
+  --admin-gold: #b38a5e;
+  font-family: var(--admin-ui);
+}
+.business-desk.idesire-desk {
+  --admin-ui: "Admin Inter", Arial, sans-serif;
+  --admin-heading: "Admin Cormorant", Georgia, serif;
+  --desk-bg: #f8f3ed;
+  --desk-paper: #fffdf9;
+  --desk-accent: #5b0b2d;
+  --desk-ink: #281f21;
+  --admin-border: #e4d7ce;
+  --admin-tint: #f5ebe5;
+  --admin-surface: #fffdf9;
+  --admin-round: 11px;
+}
+.business-desk.kokies-desk {
+  --admin-ui: "Admin DM Sans", Arial, sans-serif;
+  --admin-heading: var(--admin-ui);
+  --admin-title: clamp(29px, 3.3vw, 45px);
+  --admin-section-title: clamp(19px, 1.8vw, 25px);
+  --admin-control-radius: 14px;
+  --admin-round: 17px;
+  --admin-gold: #9f5948;
+  --desk-bg: #fcf1ec;
+  --admin-surface: #fffaf5;
+  --admin-tint: #f5dfd6;
+}
+.business-desk :is(.desk-title,.workspace-heading,.dash-hero,.ops-hero) h1 {
+  font-family: var(--admin-heading); font-size: var(--admin-title); line-height: 1.05; letter-spacing: -.025em; font-weight: 600;
+}
+.business-desk :is(.desk-card,.admin-section,.ops-card-head,.studio-editor) h2 {
+  font-family: var(--admin-heading); font-size: var(--admin-section-title); line-height: 1.12; font-weight: 600;
+}
+.business-desk :is(.desk-card,.admin-section,.workspace-dialog) h3 { font-family: var(--admin-ui); font-weight: 600; }
+.business-desk :is(button,label,.ops-badge,.desk-badge) { font-weight: 500; }
+.business-desk :is(b,strong) { font-weight: 600; }
+.business-desk :is(input,select,textarea) { border-color: var(--admin-border); }
+.business-desk .desk-main :is(button,input,select,textarea) { border-radius: var(--admin-control-radius); }
+.business-desk :is(.desk-main,.workspace-dialog) :is(button,select,input:not([type=checkbox]):not([type=radio])) { min-height: var(--admin-control-height); }
+.business-desk .desk-wordmark, .business-desk .desk-wordmark span { font-family: var(--admin-heading); }
+.business-desk .desk-wordmark span { font-family: var(--admin-ui); }
+.idesire-desk .desk-layout > nav, .idesire-desk:has(.admin-workspace) .desk-layout > nav { background: #50142c; }
+.idesire-desk .desk-layout > nav button[aria-current] { background: #71364c; box-shadow: inset 2px 0 #d6b188; }
+.idesire-desk :is(.dash-hero,.ops-hero) { background: #fbf3ec; border-top: 2px solid #c9a781; }
+.idesire-desk .dash-metric-icon { color: #6d2e38; border-color: #d6b694; }
+.idesire-desk .dash-metrics strong, .idesire-desk .workspace-metrics dd { font-weight: 600; }
+.idesire-desk .orders-atelier { --ops-serif: var(--admin-heading); --ops-line: var(--admin-border); --ops-wine: var(--desk-accent); font-family: var(--admin-ui); }
+.idesire-desk .ops-kpis h2, .idesire-desk .ops-card-head h2 span { font-family: var(--admin-ui); }
+.idesire-desk .ops-register-list { gap: 0; }
+.idesire-desk button.ops-order-row { border-radius: 0; border: 0; border-bottom: 1px solid var(--admin-border); background: transparent; padding: 11px; }
+.idesire-desk button.ops-order-row[aria-pressed=true] { background: #f6e8e7; box-shadow: inset 2px 0 var(--desk-accent); }
+.idesire-desk .ops-row-copy > span:not(.ops-row-meta) { color: #504347; }
+.idesire-desk .ops-row-copy strong, .idesire-desk .ops-row-meta b { font-weight: 600; }
+.kokies-desk .gift-dashboard .dash-hero { border: 0; background: var(--admin-tint); padding: clamp(18px, 3.2vw, 38px); }
+.kokies-desk .gift-dashboard .dash-metrics > button { border: 0; border-bottom: 2px solid #c88d7c; }
+.kokies-desk .gift-dashboard .dash-metrics strong { font-weight: 600; }
+.kokies-desk .gift-workroom > div:first-child > .admin-section:first-child { background: #f5dfd6; border: 0; border-left: 4px solid #a65f54; }
+.kokies-desk .desk-layout > nav button[aria-current] { border-radius: 16px; box-shadow: none; }
+.kokies-desk .desk-mode-products .desk-product { border-radius: 18px; overflow: hidden; }
+.kokies-desk .desk-mode-products .desk-product img { border-radius: 0; }
+.density-pagination { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-block: 12px 0; padding-top: 8px; border-top: 1px solid var(--admin-border); }
+.density-pagination > div, .density-pagination > div > span { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.density-pagination > span { color: #6c5558; font-size: 12px; }
+.business-desk .desk-main .density-pagination button { min-height: 34px; min-width: 32px; padding: 4px 8px; font-size: 12px; justify-content: center; }
+.business-desk .density-pagination button[aria-current=page] { color: var(--desk-accent); border-color: var(--desk-accent); background: var(--admin-tint); }
+.business-desk .density-pagination button:disabled { cursor: default; }
+.business-desk .density-view-all { margin-top: 10px; border-color: transparent; color: var(--desk-accent); background: transparent; }
+.density-section { min-width: 0; margin-block: 12px; border: 1px solid var(--admin-border); border-radius: var(--admin-control-radius); background: var(--admin-surface); }
+.density-section > summary { min-height: 44px; padding: 9px 12px; display: flex; align-items: center; gap: 9px; cursor: pointer; color: var(--desk-accent); }
+.density-section > summary::-webkit-details-marker { display: none; }
+.density-section > summary > span:first-child { flex: 1; }
+.density-section > summary small { display: block; }
+.density-section > summary svg { flex: none; transition: transform .16s ease; }
+.density-section[open] > summary svg { transform: rotate(180deg); }
+.density-count { border-radius: 20px; background: var(--admin-tint); padding: 2px 8px; font-size: 12px; }
+.density-section-body { padding: 10px 12px; border-top: 1px solid var(--admin-border); }
+.density-section-body > .workspace-fieldset { margin-top: 0; padding-top: 0; border: 0; }
+@media (max-width: 760px) {
+  .business-desk { --admin-title: clamp(35px, 8vw, 47px); }
+  .business-desk.kokies-desk { --admin-title: clamp(28px, 7vw, 36px); }
+  .business-desk .desk-main .density-pagination button { min-height: 44px; min-width: 38px; }
+}
+@media (prefers-reduced-motion: reduce) { .density-section > summary svg { transition: none; } }
+.kokies-desk .gift-dashboard .dash-hero,
+.kokies-desk .gift-dashboard .dash-hero :is(h1,.desk-kicker) { color: #522b31; }
+.admin-catalogue-tools { justify-content: flex-start; }
+.business-desk .ops-activity .density-section { margin-bottom: 0; }
+
+.business-desk .ops-detail > form { grid-template-columns: minmax(0, 1fr); }
+.ops-detail :is(.ops-timeline,.ops-items-layout,.ops-notes-grid) { min-width: 0; }
+.business-desk :is(.dash-metrics strong,.workspace-metrics dd) { font-variant-numeric: lining-nums tabular-nums; }
+@media (max-width: 500px) {
+  .ops-toolbar .ops-dates[open] { flex-basis: 100%; }
+  .ops-toolbar .ops-dates > div { position: static; width: min(100%, 19rem); margin-top: 6px; }
+  .ops-detail-top { grid-template-columns: minmax(0,1fr); }
+}

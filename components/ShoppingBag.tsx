@@ -17,6 +17,7 @@ export default function ShoppingBag({ brand }: { brand: Brand }) {
     [recovering, setRecovering] = useState(true),
     [quote, setQuote] = useState(false);
   const submitting = useRef(false);
+  const [deliveryMethod, setDeliveryMethod] = useState("delivery");
   const checkoutStorage = "checkout-receipt-" + brand;
   useEffect(() => {
     let active = true;
@@ -48,7 +49,7 @@ export default function ShoppingBag({ brand }: { brand: Brand }) {
   };
   const needsQuote = lines.some(line => {
     const product = data?.products.find(p => p.id === line.productId);
-    return product?.price === null || product?.sample || (brand === "kokies" && product?.priceConfirmed !== true) ||
+    return product?.price === null || product?.sample || product?.availability === "made" || product?.availability === "preorder" || (brand === "kokies" && product?.priceConfirmed !== true) ||
       (line.personalisation?.method && line.personalisation.method !== "none") ||
       (!!line.personalisation?.productColour && line.personalisation.productColour !== "As pictured");
   });
@@ -58,7 +59,7 @@ export default function ShoppingBag({ brand }: { brand: Brand }) {
   });
   const invalidLines = !!data && lines.some(line => {
     const product = data.products.find(p => p.id === line.productId);
-    return !product || !Number.isInteger(line.quantity) || line.quantity < product.minimum || line.quantity > 100000;
+    return !product || !Number.isInteger(line.quantity) || line.quantity < product.minimum || line.quantity > (product.maximum ?? 100000);
   });
   const total = lines.reduce(
     (n, l) =>
@@ -138,7 +139,7 @@ export default function ShoppingBag({ brand }: { brand: Brand }) {
                             : `${naira(p.price)} / ${p.unit}`}
                         </p>
                         {p.price !== null && !p.sample && <p>{data?.inventory.find(i => i.productId === p.id)?.available ?? 0} {p.unit === "yard" ? "yards" : "units"} available</p>}
-                        {l.colour && <p>Colour: {l.colour}</p>}
+                        {l.colour && <p>Colour: {l.colour}</p>}{l.size && <p>Size: {l.size}</p>}
                         {l.personalisation &&
                           l.personalisation.method !== "none" && (
                             <p>
@@ -154,6 +155,7 @@ export default function ShoppingBag({ brand }: { brand: Brand }) {
                           <input
                             type="number"
                             min={p.minimum}
+                            max={p.maximum ?? 100000}
                             step="1"
                             value={l.quantity}
                             onChange={(e) =>
@@ -244,16 +246,16 @@ export default function ShoppingBag({ brand }: { brand: Brand }) {
               Phone
               <input name="phone" type="tel" autoComplete="tel" required />
             </label>
-            <label>
-              Delivery address
-              <textarea name="address" autoComplete="street-address" required />
-            </label>
+            <p><Link href={(brand === "kokies" ? homePath(brand) : "") + "/account"}>Sign in</Link> to save this order to your account, or continue as a guest.</p>
+            <label>Delivery method<select name="deliveryMethod" value={deliveryMethod} onChange={e => setDeliveryMethod(e.target.value)}><option value="delivery">Delivery</option><option value="pickup">Arrange pickup</option></select></label>
+            {deliveryMethod === "delivery" ? <label>Delivery address<textarea name="address" autoComplete="street-address" required /></label> :
+              <p>Our team will confirm the pickup location and time on WhatsApp.</p>}
             <label>
               Order notes / required date
               <textarea name="notes" />
             </label>
             {error && <p role="alert">Could not refresh the catalogue. <button type="button" onClick={reload}>Retry</button></p>}
-            {invalidLines && <p role="alert">Review the minimum quantity and remove unavailable products.</p>}
+            {invalidLines && <p role="alert">Review the minimum and maximum quantities, and remove unavailable products.</p>}
             {insufficient && !needsQuote && <label className="stock-quote-choice">
               <input type="checkbox" checked={quote} onChange={e => setQuote(e.target.checked)} />
               Request a quote instead. Your quantity exceeds current availability.

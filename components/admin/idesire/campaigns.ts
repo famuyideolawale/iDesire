@@ -1,0 +1,5 @@
+export const campaignDefaults = (title: string, text: string) => [
+    { eyebrow: 'THE NEW ASOEBI EDIT', title, text, image: '/campaigns/idesire-fashion-hero.webp', alt: 'Contemporary Nigerian fashion campaign featuring a woman in intricate burgundy lace and gele', href: '/shop', cta: 'Explore the collection', style: 'fashion-campaign' },
+    { eyebrow: 'COLOUR. TEXTURE. POSSIBILITY.', title: 'A fabric. A feeling. A statement.', text: 'Discover richly embroidered lace, considered colours and details made to stand out.', image: '/products/royal-bloom-emerald.webp', alt: 'Intricate emerald green embroidered occasion lace', href: '/shop', cta: 'Find your fabric', style: 'fabric-campaign' },
+    { eyebrow: 'THE 2027 ASOEBI PRE-ORDER', title: 'Your people. One unforgettable look.', text: 'Bring your wedding party together with coordinated fabrics and thoughtful finishing touches.', image: '/idesire-yoruba-wedding-hero.webp', alt: 'A Nigerian couple in coordinated burgundy traditional wedding attire', href: '/wedding-orders', cta: 'Plan a wedding order', style: 'wedding-campaign' },
+  ];

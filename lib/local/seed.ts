@@ -33,6 +33,7 @@ const idesirePages = [
   ["customisation", "Customisation", "/customisation"],
   ["track-order", "Order tracking", "/track-order"],
   ["cart", "Shopping bag", "/cart"],
+  ["account", "Customer account", "/account"],
   ["product", "Product template", "/product/[slug]"],
 ];
 const giftPages = [
@@ -53,6 +54,7 @@ const giftPages = [
   ["help", "Ordering & FAQs", "/kokies-world-of-gift/help"],
   ["track-order", "Order tracking", "/kokies-world-of-gift/track-order"],
   ["cart", "Gift bag", "/kokies-world-of-gift/cart"],
+  ["account", "Customer account", "/kokies-world-of-gift/account"],
   ["product", "Product template", "/kokies-world-of-gift/[id]"],
 ];
 export function seedBusiness(brand: Brand): BusinessData {
@@ -89,6 +91,38 @@ export function seedBusiness(brand: Brand): BusinessData {
         label: p.label,
         sourceUrl: p.sourceUrl,
       }));
+  const extras: [string, string, number, string, number][] = isGift ? [
+    ["Executive Welcome Box", "Corporate Gifts", 48000, "celebration-gift-set.png", 50],
+    ["Conference Desk Kit", "Stationery", 16500, "branded-notebooks.png", 100],
+    ["Wedding Keepsake Tumblers", "Wedding Gifts", 19500, "anniversary-tumblers.png", 100],
+    ["Birthday Hydration Gift", "Birthday Gifts", 14500, "colourful-bottles.png", 25],
+    ["Branded Travel Flask", "Drinkware", 24500, "personalised-flasks.png", 100],
+    ["Event Charging Essentials", "Tech Gifts", 26000, "multifunction-cable-gift-set.png", 250],
+    ["Champagne Gift Packaging", "Packaging", 8500, "celebration-gift-set.png", 50],
+    ["Executive Clock Presentation", "Luxury Gifts", 76000, "wooden-pendulum-clock.png", 20],
+    ["Expo Tumbler Programme", "Promotional Items", 21000, "corporate-tumblers.png", 500],
+  ] : [
+    ["Champagne Petal Lace", "Occasion Lace", 32000, "embellished-lace-champagne-gold.webp", 5],
+    ["Powder Blue Evening Sequin", "Evening Fabrics", 28500, "sequin-lace-powder-blue.webp", 5],
+    ["Ivory Bridal Sequin", "Bridal Fabrics", 34500, "sequin-lace-white.webp", 5],
+    ["Navy Garden Embroidery", "Occasion Lace", 39500, "royal-bloom-navy.webp", 5],
+    ["Sage Celebration Lace", "Asoebi", 42000, "embellished-lace-sage-green.webp", 5],
+  ];
+  for (const [index, [name, category, price, image, minimum]] of extras.entries()) {
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    products.push({
+      id: isGift ? "gift-" + slug : slug, slug, name, category, collection: category,
+      sku: (isGift ? "KOK" : "IDT") + "-SAMPLE-" + (index + 1), price,
+      image: (isGift ? "/kokies/" : "/products/") + image,
+      description: isGift ? "Illustrative gifting option. Ask the team to confirm finish, packaging and lead time." :
+        "Illustrative fabric selection. Ask the team to confirm the colour, finish and available length.",
+      minimum, unit: isGift ? "unit" : "yard", status: "published", sample: true,
+      availability: index % 3 === 0 ? "preorder" : "made",
+      customisation: isGift ? (index === 6 ? "none" : index % 2 ? "branded" : "personalised") : "none",
+      leadTime: isGift ? "7–14 working days after approval" : "Confirm with the fabric team",
+      featured: index === 0, newArrival: index < 3,
+    });
+  }
   const names = isGift
     ? [
         "Adaobi Mensah",
@@ -158,7 +192,7 @@ export function seedBusiness(brand: Brand): BusinessData {
     "Processing",
     "Awaiting payment",
   ] as const;
-  const orders = statuses.map((status, i) => {
+  const orders = [...statuses, ...(isGift ? (["Awaiting quotation", "Ready for dispatch", "Completed"] as const) : [])].map((status, i) => {
     const p = products[i % Math.min(products.length, isGift ? 8 : 7)],
       c = customers[i % customers.length],
       quantity = isGift ? ((i % 3) + 1) * 100 : ((i % 4) + 1) * 5;
@@ -188,7 +222,7 @@ export function seedBusiness(brand: Brand): BusinessData {
       ].includes(status)
         ? "Paid"
         : "Unpaid") as "Paid" | "Unpaid",
-      source: "Demo setup",
+      source: (["Website", "WhatsApp", "Admin", "Manual"] as const)[i % 4],
       notes: isGift
         ? "Sample personalisation: event name and gift presentation to confirm."
         : "Sample wedding/group fabric order. Colours confirmed with the customer.",
@@ -216,7 +250,7 @@ export function seedBusiness(brand: Brand): BusinessData {
       order.items.some((item) => item.unitPrice === null) &&
       !["Cancelled", "Completed"].includes(order.status)
     )
-      order.status = "Awaiting quotation";
+      { order.status = "Awaiting quotation"; order.paymentStatus = "Unpaid"; }
     if (
       ["Awaiting payment", "Paid", "Processing", "Ready for dispatch"].includes(
         order.status,
@@ -267,6 +301,7 @@ export function seedBusiness(brand: Brand): BusinessData {
         protected: [
           "cart",
           "track-order",
+          "account",
           "product",
           "contact",
           "wedding-orders",

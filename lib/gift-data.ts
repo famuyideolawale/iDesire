@@ -12,6 +12,21 @@ export type GiftProduct = {
   minimum?: number;
   quoteOnly?: boolean;
   priceConfirmed?: boolean;
+  colours?: { name: string; slug: string; hex: string; image: string }[];
+  sku?: string;
+  collection?: string;
+  sizes?: string[];
+  relatedIds?: string[];
+  salePrice?: number | null;
+  maximum?: number;
+  availability?: "stock" | "made" | "preorder";
+  leadTime?: string;
+  seoTitle?: string;
+  seoDescription?: string;
+  featured?: boolean;
+  newArrival?: boolean;
+  customisation?: "none" | "personalised" | "branded";
+
   gallery?: { src: string; label: string }[];
 };
 export const sampleGiftProducts: GiftProduct[] = [

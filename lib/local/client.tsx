@@ -70,6 +70,7 @@ export const useLocal = () => useContext(Context);
 export function asFabric(p: LocalProduct): Product {
   return {
     slug: p.slug,
+    id: p.id, sizes: p.sizes, collection: p.collection, relatedIds: p.relatedIds, featured: p.featured, newArrival: p.newArrival,
     name: p.name,
     category: p.category,
     price: p.price ?? undefined,
@@ -93,6 +94,10 @@ export function asGift(p: LocalProduct): GiftProduct {
     minimum: p.minimum,
     quoteOnly: p.price === null,
     priceConfirmed: p.priceConfirmed === true,
+    colours: p.colours,
+    sku: p.sku, collection: p.collection, maximum: p.maximum, sizes: p.sizes, relatedIds: p.relatedIds,
+    availability: p.availability, leadTime: p.leadTime, customisation: p.customisation,
+    featured: p.featured, newArrival: p.newArrival,
     gallery: p.gallery,
     image: p.image,
     note: p.description,

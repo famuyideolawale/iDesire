@@ -11,8 +11,9 @@ import {
 import { checkOrigin, requireUser } from "../../../../lib/local/auth";
 import { body, failure } from "../../../../lib/local/http";
 import { availableStock, checkoutHash, createOrder, createEnquiry, holdExpired, needsFinalQuote, normalPhone } from "../../../../lib/local/actions";
+import { customerToken, signedInCustomer } from "../../../../lib/local/customer-auth";
 import { limitRequest } from "../../../../lib/local/rate-limit";
-import type { LocalOrder } from "../../../../lib/local/types";
+import { effectivePrice, type LocalOrder } from "../../../../lib/local/types";
 
 function orderStatus(o: LocalOrder) {
   return {
@@ -55,7 +56,7 @@ export async function GET(
         sharedElements: preview
           ? (b.sharedDesign?.draft ?? [])
           : (b.sharedDesign?.published ?? []),
-        products: b.products.filter((p) => p.status === "published"),
+        products: b.products.filter(p => p.status === "published").map(p => ({...p, price: effectivePrice(p)})),
         inventory: b.inventory.map((i) => ({
           productId: i.productId,
           available: availableStock(b, i.productId),
@@ -129,14 +130,17 @@ export async function POST(
     }
     if (input.type === "order" || input.type === "enquiry")
       limitRequest(request, "order", 30, 5 * 60_000);
+    const token = input.type === "order" ? await customerToken(brand) : "";
     const result = await mutate(
       brand,
       "Website visitor",
       String(input.type),
       "website",
-      (b) => {
-        if (input.type === "order")
-          return orderStatus(createOrder(b, brand, input, "Website visitor"));
+      (b, db) => {
+        if (input.type === "order") {
+          const account = signedInCustomer(db, brand, token);
+          return orderStatus(createOrder(b, brand, input, "Website visitor", false, account?.id));
+        }
         if (input.type === "enquiry") return createEnquiry(b, brand, input);
         if (input.type === "subscribe") {
           const email = required(input.email, "Email", 200).toLowerCase();
