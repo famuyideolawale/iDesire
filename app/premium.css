@@ -302,3 +302,9 @@ p { text-wrap: pretty; }
 .idesire-site .fabric-subtotal { display: none; }
 .bag-line-total { font-size: 13px; color: #5e4f4d; }
 .bag-line-total b { color: #25191b; }
+.yard-label-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.yard-label-row .field-label { margin: 0; }
+.yard-rate {
+  font: 600 13px/1 'DM Sans', sans-serif; color: #800020; background: #fff1ea;
+  border: 1px solid #f0d9cf; border-radius: 999px; padding: 6px 12px; white-space: nowrap;
+}

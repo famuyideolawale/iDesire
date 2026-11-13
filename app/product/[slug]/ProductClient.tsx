@@ -138,7 +138,10 @@ export default function ProductPage() {
           </>
         )}
         <div className="yard-picker">
-          <label className="field-label" htmlFor="fabric-yards">How many yards?</label>
+          <div className="yard-label-row">
+            <label className="field-label" htmlFor="fabric-yards">How many yards?</label>
+            {p.price !== undefined && <span className="yard-rate">1 yard = {naira(p.price)}</span>}
+          </div>
           <div className="yard-stepper">
             <button type="button" aria-label="One yard less" disabled={yards <= minimumYards} onClick={() => setYards(yards - 1)}>−</button>
             <input
@@ -163,7 +166,7 @@ export default function ProductPage() {
             ))}
           </div>
           <p id="yard-help" className={"yard-help" + (yardsValid ? "" : " yard-help-error")}>
-            {yardsValid ? `Minimum ${minimumYards} yards. Any amount above that, in whole yards.`
+            {yardsValid ? `Type any number of yards. Minimum ${minimumYards} yards.`
               : `Enter a whole number from ${minimumYards} to ${MAX_YARDS.toLocaleString("en-NG")} yards.`}
           </p>
         </div>
