@@ -13,6 +13,8 @@ import Link from "next/link";
 import { ProductGallery, CataloguePhoto } from "../../../components/ProductGallery";
 import { FabricServices } from "../../../components/FabricServices";
 
+const MAX_YARDS = 10000;
+
 export default function ProductPage() {
   const params = useParams<{ slug: string }>();
   const { data: serverData } = useLocal();
@@ -20,19 +22,18 @@ export default function ProductPage() {
   const catalogueLoaded = !!serverData;
   const p = catalogue.find((x) => x.slug === params.slug);
   const [colourSlug, setColourSlug] = useState("");
-  const [yards, setYards] = useState(5);
-  const [quantity, setQuantity] = useState(1);
+  // Customers buy fabric by the yard: one number in, the total out.
+  const [yardsText, setYardsText] = useState("5");
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const colour = params.get("colour");
     setColourSlug(p?.colours?.find(c => c.slug === colour)?.slug ?? p?.colours?.[0]?.slug ?? "");
     const minimum = p?.minimumYards ?? 5;
+    // Older shared links used "pieces" of a fixed length; convert them to total yards.
     const length = Number(params.get("yards"));
-    const options = p?.yardOptions ?? [5, 6, 7, 8, 9, 10];
-    setYards(Number.isInteger(length) && length >= minimum && length <= 100000 &&
-      (!p?.colours?.length || options.includes(length) || length === minimum) ? length : minimum);
-    const pieces = Number(params.get("pieces"));
-    setQuantity(Number.isInteger(pieces) && pieces >= 1 && pieces <= 100000 ? pieces : 1);
+    const pieces = Number(params.get("pieces")) || 1;
+    const total = Number.isInteger(length) && Number.isInteger(pieces) ? length * pieces : NaN;
+    setYardsText(String(total >= minimum && total <= MAX_YARDS ? total : minimum));
   }, [p?.slug, p?.minimumYards]);
   const [requestedSize, setSize] = useState("");
   const [notice, setNotice] = useState("");
@@ -46,6 +47,12 @@ export default function ProductPage() {
     return notFound();
   }
   const size = p.sizes?.includes(requestedSize) ? requestedSize : p.sizes?.[0];
+  const minimumYards = p.minimumYards ?? 5;
+  const typed = Number(yardsText);
+  const yardsValid = yardsText !== "" && Number.isInteger(typed) && typed >= minimumYards && typed <= MAX_YARDS;
+  const yards = yardsValid ? typed : minimumYards;
+  const setYards = (value: number) => setYardsText(String(Math.min(MAX_YARDS, Math.max(minimumYards, Math.round(value)))));
+  const subtotal = p.price !== undefined ? p.price * yards : undefined;
   const selectedColour = p.colours?.find((c) => c.slug === colourSlug);
   const image = selectedColour?.image ?? p.image;
   const message = [
@@ -53,9 +60,9 @@ export default function ProductPage() {
     p.name,
     selectedColour && "Colour: " + selectedColour.name,
     size && "Size: " + size,
-    "Quantity: " + quantity + (quantity === 1 ? " piece" : " pieces") + " × " + yards + " yards",
+    "Yards: " + yards,
     p.price === undefined ? "Price: Please quote" :
-      "Estimated subtotal: " + naira(p.price * yards * quantity) + " (" + naira(p.price) + "/yard)",
+      "Fabric total: " + naira(p.price * yards) + " (" + naira(p.price) + " per yard × " + yards + " yards)",
     "",
     "Is it available, and what would delivery cost?",
   ].filter(line => line !== undefined).join("\n");
@@ -128,100 +135,69 @@ export default function ProductPage() {
                 />
               ))}
             </div>
-            <label className="field-label" htmlFor="yards">
-              Fabric length
-            </label>
-            <select
-              id="yards"
-              value={yards}
-              onChange={(e) => setYards(Number(e.target.value))}
-              style={{
-                display: "block",
-                width: "100%",
-                padding: 13,
-                margin: "8px 0 18px",
-                border: "1px solid #ded5d0",
-                background: "transparent",
-              }}
-            >
-              {Array.from(
-                new Set([
-                  p.minimumYards ?? 5,
-                  ...(p.yardOptions ?? [5, 6, 7, 8, 9, 10]).filter(
-                    (y) => y >= (p.minimumYards ?? 5),
-                  ),
-                ]),
-              ).map((y) => (
-                <option key={y} value={y}>
-                  {p.price
-                    ? `${y} yards · ${naira(p.price * y)} per piece`
-                    : `${y} yards`}
-                </option>
-              ))}
-            </select>
           </>
         )}
-        {!p.colours && (
-          <>
-            <label className="field-label" htmlFor="fabric-yards">
-              Fabric length (yards)
-            </label>
+        <div className="yard-picker">
+          <label className="field-label" htmlFor="fabric-yards">How many yards?</label>
+          <div className="yard-stepper">
+            <button type="button" aria-label="One yard less" disabled={yards <= minimumYards} onClick={() => setYards(yards - 1)}>−</button>
             <input
               id="fabric-yards"
               type="number"
-              min={p.minimumYards ?? 5}
+              inputMode="numeric"
+              min={minimumYards}
+              max={MAX_YARDS}
               step="1"
-              value={yards}
-              onChange={(e) =>
-                setYards(
-                  Math.max(
-                    p.minimumYards ?? 5,
-                    Math.floor(Number(e.target.value) || 5),
-                  ),
-                )
-              }
+              value={yardsText}
+              aria-describedby="yard-help"
+              aria-invalid={!yardsValid}
+              onChange={(e) => setYardsText(e.target.value.replace(/[^\d]/g, "").slice(0, 5))}
+              onBlur={() => { if (!yardsValid) setYards(Number(yardsText) || minimumYards); }}
             />
-          </>
-        )}
-        <label className="field-label" htmlFor="quantity">
-          {p.colours ? `Number of ${yards}-yard pieces` : "Number of pieces"}
-        </label>
-        <div className="quantity-row">
-          <input
-            id="quantity"
-            type="number"
-            min="1"
-            value={quantity}
-            onChange={(e) =>
-              setQuantity(Math.max(1, Number(e.target.value) || 1))
-            }
-          />
-          <span>Need a larger quantity? Ask about a group order.</span>
+            <span className="yard-unit">yards</span>
+            <button type="button" aria-label="One yard more" disabled={yards >= MAX_YARDS} onClick={() => setYards(yards + 1)}>+</button>
+          </div>
+          <div className="yard-chips" aria-label="Quick amounts">
+            {[...new Set([minimumYards, 10, 20, 50, 100])].filter((n) => n >= minimumYards).map((n) => (
+              <button key={n} type="button" aria-pressed={yards === n && yardsValid} onClick={() => setYards(n)}>{n} yd</button>
+            ))}
+          </div>
+          <p id="yard-help" className={"yard-help" + (yardsValid ? "" : " yard-help-error")}>
+            {yardsValid ? `Minimum ${minimumYards} yards. Any amount above that, in whole yards.`
+              : `Enter a whole number from ${minimumYards} to ${MAX_YARDS.toLocaleString("en-NG")} yards.`}
+          </p>
         </div>
         {serverData && p.price !== undefined && (() => {
           const id = serverData.products.find(product => product.slug === p.slug)?.id ?? p.slug;
           const available = serverData.inventory.find(item => item.productId === id)?.available ?? 0;
-          const needed = yards * quantity;
+          const needed = yards;
           return <p className={"stock-note" + (available < needed ? " stock-low" : "")}>
             {available <= 0 ? "Sold out for now. Ask us about the next delivery."
-              : available < needed ? `Only ${available} yards left. Reduce the quantity or ask about a group order.`
+              : available < needed ? `Only ${available} yards in stock right now. You can still add ${yards} yards and request a quote at checkout.`
               : available <= 30 ? `Only ${available} yards left in this colourway.`
               : "In stock and ready to cut."}
           </p>;
         })()}
-        {p.price !== undefined && <p className="fabric-subtotal">Fabric subtotal <strong>{naira(p.price * yards * quantity)}</strong></p>}
+        {subtotal !== undefined && (
+          <div className="fabric-total" aria-live="polite">
+            <span>{naira(p.price!)} × {yards.toLocaleString("en-NG")} yards</span>
+            <strong>{naira(subtotal)}</strong>
+            <small>Delivery is added at checkout for your location.</small>
+          </div>
+        )}
         {p.sizes?.length ? <label className="field-label">Size <select value={size} onChange={e=>setSize(e.target.value)}>{p.sizes.map(option=><option key={option}>{option}</option>)}</select></label> : null}
         <div className="fabric-actions">
         <button
           className="button button-dark"
+          disabled={!yardsValid}
           onClick={() => {
             addToBag("idesire", {
               productId: p.slug,
-              quantity: yards * quantity,
+              quantity: yards,
               colour: selectedColour?.name,
               size,
             });
-            setNotice("Added to your fabric bag.");
+            setNotice(`Added ${yards} yards to your fabric bag.`);
           }}
         >
           Add to fabric bag
@@ -235,7 +211,7 @@ export default function ProductPage() {
           Ask about this fabric on WhatsApp ↗
         </a>
         <div className="detail-accordions">
-          <FabricServices fabric={p.name} colour={colourSlug || undefined} yards={yards} quantity={quantity} />
+          <FabricServices fabric={p.name} colour={colourSlug || undefined} yards={yards} />
           {p.price && (
             <>
                 <details>

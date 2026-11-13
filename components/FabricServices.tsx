@@ -2,8 +2,8 @@
 import { useState } from "react";
 import { api } from "../lib/local/client";
 
-export function FabricServices({ fabric, colour, yards, quantity }: {
-  fabric: string; colour?: string; yards: number; quantity: number;
+export function FabricServices({ fabric, colour, yards }: {
+  fabric: string; colour?: string; yards: number;
 }) {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -11,7 +11,7 @@ export function FabricServices({ fabric, colour, yards, quantity }: {
   return <>
     <button type="button" className="button button-outline" onClick={async () => {
       const url = new URL(location.href);
-      url.search = new URLSearchParams({ ...(colour ? {colour} : {}), yards: String(yards), pieces: String(quantity) }).toString();
+      url.search = new URLSearchParams({ ...(colour ? {colour} : {}), yards: String(yards) }).toString();
       url.hash = "";
       try { await navigator.clipboard.writeText(url.href); setNotice("Fabric selection link copied."); }
       catch { setShareUrl(url.href); }

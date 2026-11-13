@@ -156,6 +156,11 @@ export default function ShoppingBag({ brand }: { brand: Brand }) {
                             ? "Price to quote"
                             : `${naira(p.price)} / ${p.unit}`}
                         </p>
+                        {p.price !== null && l.quantity > 0 && (
+                          <p className="bag-line-total">
+                            {l.quantity.toLocaleString("en-NG")} {p.unit === "yard" ? "yards" : "units"} · <b>{naira(p.price * l.quantity)}</b>
+                          </p>
+                        )}
                         {p.price !== null && !p.sample && (() => {
                           const available = data?.inventory.find(i => i.productId === p.id)?.available ?? 0;
                           const unit = p.unit === "yard" ? "yards" : "units";
@@ -173,9 +178,10 @@ export default function ShoppingBag({ brand }: { brand: Brand }) {
                             </p>
                           )}
                         <label>
-                          Quantity
+                          {p.unit === "yard" ? "Yards" : "Quantity"}
                           <input
                             type="number"
+                            inputMode="numeric"
                             min={p.minimum}
                             max={p.maximum ?? 100000}
                             step="1"
@@ -308,7 +314,7 @@ export default function ShoppingBag({ brand }: { brand: Brand }) {
             {invalidLines && <p role="alert">Review the minimum and maximum quantities, and remove unavailable products.</p>}
             {insufficient && !needsQuote && <label className="stock-quote-choice">
               <input type="checkbox" checked={quote} onChange={e => setQuote(e.target.checked)} />
-              Request a quote instead. Your quantity exceeds current availability.
+              Request a quote instead. You've asked for more than we have in stock right now.
             </label>}
             <section className="checkout-steps" aria-labelledby="checkout-steps-title">
               <h3 id="checkout-steps-title">How payment works</h3>

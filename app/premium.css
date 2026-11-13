@@ -261,3 +261,44 @@ p { text-wrap: pretty; }
 .order-summary-total dd { font-size: 20px; color: #800020; }
 .kokies-site .order-summary-total dd { color: #74333a; }
 .order-summary p { margin: 0; font-size: 12.5px; line-height: 1.5; color: #7b6c69; }
+
+/* ---------- iDesire: buy by the yard ---------- */
+.yard-picker { margin: 6px 0 14px; }
+.yard-stepper {
+  display: grid; grid-template-columns: 48px 1fr auto 48px; align-items: center;
+  margin-top: 8px; border: 1px solid #ded2cb; border-radius: 12px; background: #fffdf9; overflow: hidden;
+}
+.yard-stepper:focus-within { border-color: #800020; box-shadow: 0 0 0 3px #80002020; }
+.yard-stepper button {
+  height: 52px; border: 0; background: transparent; color: #800020; font-size: 22px; line-height: 1; cursor: pointer;
+  transition: background 0.15s ease;
+}
+.yard-stepper button:hover:not(:disabled) { background: #f8ece6; }
+.yard-stepper button:disabled { color: #c9b8b3; cursor: not-allowed; }
+.yard-stepper input {
+  width: 100%; min-width: 0; height: 52px; border: 0 !important; outline: none; background: transparent; box-shadow: none !important;
+  text-align: right; font: 600 22px/1 'DM Sans', sans-serif; color: #25191b; padding: 0 6px !important; margin: 0 !important;
+  -moz-appearance: textfield;
+}
+.yard-stepper input::-webkit-outer-spin-button, .yard-stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.yard-stepper input[aria-invalid="true"] { color: #b3261e; }
+.yard-unit { font-size: 14px; color: #796d6b; padding-right: 12px; }
+.yard-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.yard-chips button {
+  border: 1px solid #e2d4cc; background: #fff; color: #4b1922; border-radius: 999px; padding: 7px 14px;
+  font: 600 12.5px/1 'DM Sans', sans-serif; cursor: pointer; transition: all 0.15s ease;
+}
+.yard-chips button:hover { border-color: #800020; }
+.yard-chips button[aria-pressed="true"] { background: #800020; border-color: #800020; color: #fff5eb; }
+.yard-help { font-size: 12.5px; color: #796d6b; margin: 8px 0 0; }
+.yard-help-error { color: #b3261e; }
+.fabric-total {
+  display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 4px 12px;
+  margin: 6px 0 16px; padding: 16px 18px; border-radius: 14px; background: #fff7f2; border: 1px solid #efdcd3;
+}
+.fabric-total span { font-size: 14px; color: #5e4f4d; }
+.fabric-total strong { font: 400 28px/1.1 'Playfair Display', Georgia, serif; color: #800020; }
+.fabric-total small { grid-column: 1 / -1; font-size: 12px; color: #8a7b78; }
+.idesire-site .fabric-subtotal { display: none; }
+.bag-line-total { font-size: 13px; color: #5e4f4d; }
+.bag-line-total b { color: #25191b; }
